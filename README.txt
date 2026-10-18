@@ -1,7 +1,7 @@
 TPWEB 16 - PORTAIL DE RESSOURCES PÉDAGOGIQUES
 =============================================
 
-INSTALLATION AVEC XAMPP (Windows, a adapter pour Linux et MacOS)
+INSTALLATION AVEC XAMPP (Windows, à adapter pour Linux et MacOS)
 ----------------------------------------------------------------
 1) Décompressez le dossier TPWeb dans C:\xampp\htdocs\TPWeb
 2) Lancez XAMPP Control Panel, démarrez Apache, puis ouvrez http://localhost/TPWeb/admin.php
