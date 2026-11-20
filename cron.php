@@ -22,6 +22,7 @@ require_once __DIR__ . '/inc/trash.php';
 require_once __DIR__ . '/inc/autobackup.php';
 
 maintenance_run(in_array('--force', $argv, true));
+mail_tick(true);
 $force = in_array('--backup', $argv, true);
 $result = autobackup_run($force);
 echo date('Y-m-d H:i:s') . ' maintenance faite';

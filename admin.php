@@ -15,9 +15,12 @@ require_once __DIR__ . '/inc/admin/views_students.php';
 require_once __DIR__ . '/inc/admin/views_admin.php';
 require_once __DIR__ . '/inc/admin/views_quiz.php';
 require_once __DIR__ . '/inc/admin/views_people.php';
+require_once __DIR__ . '/inc/admin/views_home.php';
+require_once __DIR__ . '/inc/update.php';
 
 /** Menu : clé => [libellé, icône, réservé à l'administrateur, droit nécessaire]. */
 $views = [
+    'home'     => ['Tableau de bord', 'dashboard', false, null],
     'library'  => ['Bibliothèque', 'library', false, null],
     'deposits' => ['Dépôts des élèves', 'inbox', false, 'deposits'],
     'announcements' => ['Annonces', 'megaphone', false, 'announcements'],
@@ -33,6 +36,7 @@ $views = [
     'backups'  => ['Sauvegardes', 'archive', true, null],
     'storage'  => ['Stockage', 'disk', true, null],
     'settings' => ['Paramètres', 'settings', true, null],
+    'update'   => ['Mise à jour', 'refresh', true, null],
     'account'  => ['Mon compte', 'user', false, null],
     'feedback' => ['Signaler un bug / une idée', 'megaphone', false, null],
     'quiz'     => ['QCM', 'quiz', false, 'upload'], // page sans entrée de menu (ouverte depuis la bibliothèque)
@@ -106,7 +110,7 @@ if (!configured() || !logged()) {
 $user = current_user();
 maintenance_run();
 $data = settings();
-$view = query('view', 'library');
+$view = query('view', 'home');
 if ($view === 'security') $view = is_admin($user) ? 'settings' : 'account';
 $allowed = function ($v) use ($user) {
     return !($v[2] && !is_admin($user)) && ($v[3] === null || can($v[3], $user));
@@ -177,6 +181,8 @@ page_top($views[$view][0] . ' — Espace enseignant', 'admin');
         case 'students': view_students($data, $user); break;
         case 'feedback': view_feedback($user); break;
         case 'quiz':     view_quiz($data, $user); break;
+        case 'home':     view_home($data, $user); break;
+        case 'update':   view_update(); break;
         case 'storage':  view_storage($data); break;
         case 'levels':   view_levels($data); break;
         case 'users':    view_users($data, $user); break;
@@ -191,6 +197,10 @@ page_top($views[$view][0] . ' — Espace enseignant', 'admin');
 <?php
 page_end();
 
+// Courriels (bilans, résumés, file d'attente) sans tâche planifiée : après l'envoi de la page.
+if (mail_ready()) {
+    register_shutdown_function(function () { if (function_exists('fastcgi_finish_request')) @fastcgi_finish_request(); mail_tick(); });
+}
 // Sauvegarde automatique en retard (sans tâche planifiée) : après l'envoi de la page.
 if (autobackup_due()) {
     if (function_exists('fastcgi_finish_request')) fastcgi_finish_request(); else flush();

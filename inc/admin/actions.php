@@ -112,7 +112,7 @@ function handle_admin_post($action)
         'announce_save' => 'announcements', 'announce_delete' => 'announcements',
         'class_code' => 'codes',
         'my_classes' => 'own_classes',
-        'copy_to' => 'upload', 'import_zip' => 'upload', 'quiz_create' => 'upload', 'quiz_save' => 'upload', 'quiz_reset' => 'upload',
+        'copy_to' => 'upload', 'import_zip' => 'upload', 'quiz_create' => 'upload', 'quiz_save' => 'upload', 'quiz_reset' => 'upload', 'quiz_import' => 'upload', 'correction_save' => 'deposits', 'correction_delete' => 'deposits',
         'coteach_save' => 'coteach', 'groups_save' => 'groups', 'group_add' => 'groups', 'group_remove' => 'groups', 'group_members' => 'groups',
         'students_import' => 'students', 'student_save' => 'students', 'student_delete' => 'students', 'students_bulk' => 'students', 'student_request_decide' => 'students',
     ];
@@ -259,6 +259,10 @@ function handle_admin_post($action)
             if (!copy_tree($abs, dirname($abs) . DIRECTORY_SEPARATOR . $name)) return 'La copie a échoué.';
             quiz_refresh_ids(dirname($abs) . DIRECTORY_SEPARATOR . $name);
             $new = $parent === '' ? $name : $parent . '/' . $name;
+            if (post('keep_rules') === '1' && can('publish', $user)) {
+                $n = clone_sharing($item, $new, post('shift_year') === '1');
+                flash_redirect('Copie « ' . $name . ' » créée avec ses réglages de partage (' . $n . ' règle(s)' . (post('shift_year') === '1' ? ', dates décalées d’un an' : '') . ').', admin_url('library', $new));
+            }
             flash_redirect('Copie « ' . $name . ' » créée. Elle suit la publication du dossier parent : vérifiez sa visibilité.', admin_url('library', $new));
 
         case 'copy_to':
@@ -277,6 +281,10 @@ function handle_admin_post($action)
             if (!copy_tree($abs, $destAbs . DIRECTORY_SEPARATOR . $name)) return 'La copie a échoué.';
             quiz_refresh_ids($destAbs . DIRECTORY_SEPARATOR . $name);
             $new = $dest === '' ? $name : $dest . '/' . $name;
+            if (post('keep_rules') === '1' && can('publish', $user) && !in_bank($dest)) {
+                $n = clone_sharing($item, $new, post('shift_year') === '1');
+                flash_redirect('« ' . basename($item) . ' » copié avec ses réglages de partage (' . $n . ' règle(s)).', admin_url('library', $new));
+            }
             flash_redirect('« ' . basename($item) . ' » copié dans « ' . ($dest === '' ? 'Racine' : str_replace('/', ' › ', $dest)) . ' ».' . (in_bank($dest) ? '' : ' La copie suit la publication de son nouveau dossier.'), admin_url('library', $new));
 
         case 'import_zip':
@@ -333,9 +341,29 @@ function handle_admin_post($action)
                 'correction' => in_array(post('correction'), ['immediate', 'after_close', 'never'], true) ? post('correction') : 'immediate',
                 'show_correction' => post('correction') !== 'never', 'until' => clean_datetime(post('until')), 'shuffle' => post('shuffle') === '1',
                 'attempts' => max(0, min(10, (int) post('attempts', '1'))), 'questions' => $questions,
+                'draw' => max(0, min(QUIZ_MAX_QUESTIONS, (int) post('draw', '0'))),
             ];
             if (!quiz_save($abs, $quiz)) return 'Enregistrement impossible.';
             flash_redirect('QCM enregistré (' . count($questions) . ' question' . (count($questions) > 1 ? 's' : '') . ').', admin_url('quiz', $item));
+
+        case 'quiz_import':
+            $item = post('item');
+            $src = post('source');
+            $abs = full_path($item, 'file');
+            $srcAbs = full_path($src, 'file');
+            if (!$abs || !is_quiz_file($item) || !can_manage($item, $user)) return 'QCM introuvable.';
+            if (!$srcAbs || !is_quiz_file($src) || !can_manage($src, $user) || $src === $item) return 'Choisissez un autre QCM.';
+            $q = quiz_load($abs);
+            $from = quiz_load($srcAbs);
+            $pick = isset($_POST['pick']) && is_array($_POST['pick']) ? array_map('intval', $_POST['pick']) : array_keys($from['questions']);
+            $added = 0;
+            foreach ($from['questions'] as $i => $qq) {
+                if (!in_array($i, $pick, true) || count($q['questions']) >= QUIZ_MAX_QUESTIONS) continue;
+                $q['questions'][] = $qq;
+                $added++;
+            }
+            quiz_save($abs, $q);
+            flash_redirect($added . ' question(s) importée(s) depuis « ' . display_name($src) . ' ».', admin_url('quiz', $item));
 
         case 'quiz_reset':
             $item = post('item');
@@ -409,7 +437,7 @@ function handle_admin_post($action)
             $g = isset($_POST['groups'][$class]) && is_array($_POST['groups'][$class]) ? array_values(array_intersect(group_names($data, $class), $_POST['groups'][$class])) : [];
             if ($id === '') $id = student_new_id();
             $list[$id] = ['last' => $last, 'first' => $first, 'class' => $class, 'groups' => $g, 'ent_id' => $ent,
-                          'created' => isset($list[$id]['created']) ? $list[$id]['created'] : time()];
+                          'created' => isset($list[$id]['created']) ? $list[$id]['created'] : time()] + (isset($list[$id]) ? $list[$id] : []);
             save_students($list);
             if (post('again') === '1') flash_redirect(student_name($list[$id]) . ' ajouté(e). Élève suivant :', admin_url('students') . '&edit=new&class=' . rawurlencode($class));
             flash_redirect(student_name($list[$id]) . ' enregistré(e).', admin_url('students') . '&class=' . rawurlencode($class));
@@ -640,6 +668,25 @@ function handle_admin_post($action)
             save_deposits_config($all);
             flash_redirect($msg, admin_url('deposits', $item) . '#suivi');
 
+        case 'correction_save':
+            $item = post('folder');
+            $cfg = deposit_for($item);
+            header('Content-Type: application/json; charset=UTF-8');
+            if (!$cfg || !can_manage($item, $user)) { echo json_encode(['ok' => false, 'error' => 'Dépôt introuvable.']); exit; }
+            $files = uploaded_files('pdf');
+            if (!$files || $files[0]['error'] !== UPLOAD_ERR_OK) { echo json_encode(['ok' => false, 'error' => 'Envoi de la copie impossible (taille maximale : ' . human_size(upload_limit()) . ').']); exit; }
+            $err = deposit_save_correction(deposit_normalize($cfg), post('file'), $files[0]['tmp_name'], isset($_POST['annots']) ? (string) $_POST['annots'] : '');
+            if ($err === '') audit_log('correction_save', ['dossier' => $item]);
+            echo json_encode($err === '' ? ['ok' => true, 'public' => !empty(deposit_normalize($cfg)['feedback_public'])] : ['ok' => false, 'error' => $err]);
+            exit;
+
+        case 'correction_delete':
+            $item = post('folder');
+            $cfg = deposit_for($item);
+            if (!$cfg || !can_manage($item, $user)) return 'Dépôt introuvable.';
+            deposit_delete_correction(deposit_normalize($cfg), post('file'));
+            flash_redirect('Copie annotée supprimée.', admin_url('deposits', $item));
+
         case 'deposit_delete_entry':
             $item = post('folder');
             $cfg = deposit_for($item);
@@ -837,6 +884,28 @@ function handle_admin_post($action)
             save_users($users);
             flash_redirect('Double authentification désactivée.', admin_url('account'));
 
+        case 'seq_save':
+            $item = post('folder');
+            if (!full_path($item, 'dir') || $item === '' || !can_manage($item, $user) || !can('publish', $user)) return 'Dossier invalide.';
+            $mode = post('mode');
+            if (!isset($data['sequences']) || !is_array($data['sequences'])) $data['sequences'] = [];
+            if (in_array($mode, ['free', 'order'], true)) $data['sequences'][$item] = ['mode' => $mode]; else unset($data['sequences'][$item]);
+            save_settings($data);
+            flash_redirect(in_array($mode, ['free', 'order'], true) ? 'Le dossier s’affiche maintenant comme une séquence pour les élèves.' : 'Le dossier s’affiche de nouveau normalement.', admin_url('library', $item));
+
+        case 'notify_save':
+            $users = users_all();
+            $email = trim(post('email'));
+            if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) return 'Adresse électronique invalide.';
+            $users[$user['login']]['email'] = mb_substr($email, 0, 120);
+            $sub = post('submit');
+            $users[$user['login']]['notify'] = [
+                'submit' => in_array($sub, ['instant', 'daily', 'off'], true) ? $sub : 'daily',
+                'closed' => post('closed') === '1', 'feedback' => post('feedback') === '1',
+            ];
+            save_users($users);
+            flash_redirect('Préférences de notification enregistrées.', admin_url('account') . '#notifications');
+
         case 'feedback_add':
             $err = feedback_add(post('type'), post('title'), post('text'), post('page'), $user['login'], 'enseignant');
             if ($err !== '') return $err;
@@ -924,6 +993,68 @@ function handle_admin_post($action)
                 $done[] = 'corbeille vidée';
             }
             flash_redirect('Fin d’année terminée : ' . ($done ? implode(', ', $done) : 'aucune option choisie') . '.', admin_url('year'));
+
+        case 'update_check':
+        case 'update_apply':
+            $files = uploaded_files('archive');
+            if (!$files || $files[0]['error'] !== UPLOAD_ERR_OK) return 'Choisissez l’archive .zip de la nouvelle version (taille maximale : ' . human_size(upload_limit()) . ').';
+            if ($action === 'update_check') {
+                $info = update_inspect($files[0]['tmp_name']);
+                if (is_string($info)) return $info;
+                flash_redirect('Archive valide : TPWeb ' . $info['version'] . ' (' . $info['files'] . ' fichiers, ' . human_size($info['size']) . '). Version installée : ' . TPW_VERSION . '.', admin_url('update'));
+            }
+            $res = update_apply($files[0]['tmp_name']);
+            if (is_string($res)) return $res;
+            flash_redirect('TPWeb ' . $res['version'] . ' installé (' . $res['files'] . ' fichiers). Sauvegarde préalable : ' . $res['backup'] . '.', admin_url('update'));
+
+        case 'mail_settings':
+            $from = trim(post('from'));
+            if ($from !== '' && !filter_var($from, FILTER_VALIDATE_EMAIL)) return 'Adresse d’expédition invalide.';
+            $base = trim(post('base'));
+            if ($base !== '' && !preg_match('#^https?://[^\s]+$#', $base)) return 'Adresse du portail invalide (commence par https://).';
+            $data['mail'] = [
+                'enabled' => post('enabled') === '1', 'transport' => post('transport') === 'php' ? 'php' : 'smtp',
+                'host' => mb_substr(trim(post('host')), 0, 120), 'port' => max(1, min(65535, (int) post('port', '587'))),
+                'secure' => in_array(post('secure'), ['tls', 'ssl', 'none'], true) ? post('secure') : 'tls',
+                'user' => mb_substr(trim(post('user')), 0, 120), 'from' => $from,
+                'from_name' => mb_substr(trim(post('from_name')), 0, 60), 'base' => rtrim($base, '/'),
+            ];
+            save_settings($data);
+            if (post('pass') !== '') secret_set('smtp_pass', post('pass'));
+            if (post('test') === '1') {
+                $to = user_email($user);
+                if ($to === '') return 'Réglages enregistrés. Indiquez d’abord votre adresse dans « Mon compte » pour recevoir le test.';
+                if (!mail_ready()) return 'Réglages enregistrés, mais l’envoi est désactivé ou incomplet (adresse d’expédition, serveur).';
+                $err = mail_send_now($to, 'TPWeb : courriel de test', "Bonjour,\n\nCe courriel confirme que TPWeb peut envoyer des notifications.\n\n" . mail_base_url());
+                if ($err !== '') return 'Réglages enregistrés, mais le test a échoué : ' . $err;
+                flash_redirect('Courriel de test envoyé à ' . $to . '.', admin_url('settings') . '#courriels');
+            }
+            flash_redirect('Réglages des courriels enregistrés.', admin_url('settings') . '#courriels');
+
+        case 'branding_save':
+            $color = post('color');
+            $b = isset($data['branding']) && is_array($data['branding']) ? $data['branding'] : [];
+            $b['color'] = preg_match('/^#[0-9a-fA-F]{6}$/', $color) ? strtolower($color) : '#000091';
+            $b['message'] = mb_substr(trim(str_replace("\r", '', post('message'))), 0, 500);
+            $dir = branding_dir();
+            if (post('logo_remove') === '1' && !empty($b['logo'])) { @unlink($dir . DIRECTORY_SEPARATOR . $b['logo']); $b['logo'] = ''; }
+            $files = uploaded_files('logo');
+            if ($files) {
+                $f = $files[0];
+                if ($f['error'] !== UPLOAD_ERR_OK) return 'Logo : envoi impossible (fichier trop lourd ?).';
+                if ($f['size'] > 1024 * 1024) return 'Logo trop lourd (1 Mo maximum).';
+                $info = @getimagesize($f['tmp_name']);
+                $exts = [IMAGETYPE_PNG => 'png', IMAGETYPE_JPEG => 'jpg', IMAGETYPE_WEBP => 'webp'];
+                if (!$info || !isset($exts[$info[2]])) return 'Le logo doit être une image PNG, JPG ou WebP.';
+                if (!is_dir($dir)) @mkdir($dir, 0750, true);
+                if (!empty($b['logo'])) @unlink($dir . DIRECTORY_SEPARATOR . $b['logo']);
+                $name = 'logo-' . bin2hex(random_bytes(3)) . '.' . $exts[$info[2]];
+                if (!move_uploaded_file($f['tmp_name'], $dir . DIRECTORY_SEPARATOR . $name)) return 'Enregistrement du logo impossible.';
+                $b['logo'] = $name;
+            }
+            $data['branding'] = $b;
+            save_settings($data);
+            redirect(admin_url('settings') . '&saved=1#apparence');
 
         case 'legal':
             $fields = ['publisher', 'controller', 'address', 'contact', 'dpo', 'host'];
@@ -1246,7 +1377,7 @@ function handle_admin_download($type)
             if ($level !== '' && $r['level'] !== $level) continue;
             $line = [mb_strtoupper($r['last']), $r['first'], $r['level'], implode(', ', isset($r['groups']) ? $r['groups'] : []), $r['score'], $r['total'],
                      str_replace('.', ',', (string) quiz_on20($r['score'], $r['total'])), date('d/m/Y H:i', $r['time'])];
-            foreach ($quiz['questions'] as $i => $q) $line[] = !empty($r['detail'][$i]['ok']) ? '1' : '0';
+            foreach ($quiz['questions'] as $i => $q) $line[] = isset($r['detail'][$i]) ? (!empty($r['detail'][$i]['ok']) ? '1' : '0') : '';
             fputcsv($out, $line, ';');
         }
         fclose($out);
@@ -1261,6 +1392,26 @@ function handle_admin_download($type)
         $cfg = deposit_for($item);
         $full = $cfg && can_manage($item, $user) ? deposit_file_path($cfg, query('f')) : false;
         if (!$full) fail(404, 'Rendu introuvable', 'Ce rendu n’existe plus.');
+        if (query('corr') === '1') {
+            $c = deposit_file_path($cfg, deposit_correction_name(query('f')));
+            if (!$c) fail(404, 'Copie annotée introuvable', 'Cette copie n’a pas encore été annotée.');
+            foreach (deposit_entries($cfg) as $e) {
+                if ($e['file'] === query('f')) send_file($c, pathinfo(deposit_archive_name($e), PATHINFO_FILENAME) . ' - corrigé.pdf');
+            }
+        }
+        if (query('raw') === '1') {
+            // Source de l'outil d'annotation : PDF tel quel, image, ou document bureautique converti en PDF.
+            if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
+            if (is_office_file($full)) {
+                $pdf = office_pdf($full);
+                if (!$pdf) fail(415, 'Conversion impossible', 'Ce document ne peut pas être converti en PDF (LibreOffice absent ?).');
+                send_inline($pdf, 'application/pdf');
+            }
+            $types = ['pdf' => 'application/pdf', 'png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'gif' => 'image/gif', 'webp' => 'image/webp'];
+            $ext = strtolower(pathinfo($full, PATHINFO_EXTENSION));
+            if (isset($types[$ext])) send_inline($full, $types[$ext]);
+            fail(415, 'Format non annotable', 'Seuls les PDF, images et documents bureautiques peuvent être annotés.');
+        }
         foreach (deposit_entries($cfg) as $e) {
             if ($e['file'] === query('f')) send_file($full, basename(deposit_archive_name($e)));
         }

@@ -1,0 +1,4 @@
+Bibliothèques tierces utilisées par l’outil d’annotation des copies :
+
+- pdf.js 3.11.174 (pdf.min.js, pdf.worker.min.js) — Mozilla — Apache License 2.0 — https://github.com/mozilla/pdf.js
+- pdf-lib 1.17.1 (pdf-lib.min.js) — Andrew Dillon — MIT License — https://github.com/Hopding/pdf-lib

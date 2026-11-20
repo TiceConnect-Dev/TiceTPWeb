@@ -46,6 +46,7 @@ function feedback_add($type, $title, $text, $page, $author, $role, $class = '')
         'class' => mb_substr((string) $class, 0, 80), 'time' => time(), 'status' => 'new', 'replies' => [],
     ]);
     feedback_save($list);
+    if (function_exists('mail_on_feedback')) mail_on_feedback(feedback_types()[$type], $title, $author, $role);
     return '';
 }
 

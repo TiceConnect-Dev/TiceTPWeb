@@ -20,6 +20,11 @@ if ($quiz['id'] === '' || !$quiz['questions']) {
     fail(404, 'QCM vide', 'Ce QCM ne contient encore aucune question.');
 }
 
+// Tirage aléatoire de questions (banque de questions) : même tirage pour un même élève.
+$full = $quiz;
+$meSeed = current_student();
+$quiz = quiz_subset($full, ($meSeed ? $meSeed['id'] : session_id()) . $full['id']);
+
 $self = 'quiz.php?level=' . rawurlencode($level) . '&path=' . rawurlencode($path);
 $folder = dirname($path) === '.' ? '' : dirname($path);
 $classHome = class_home_folder($level);
@@ -53,7 +58,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         quiz_store_result($quiz, [
             'level' => $level, 'groups' => viewer_groups($level, $data), 'last' => $last, 'first' => $first,
             'student' => $me && $me['class'] === $level ? $me['id'] : '',
-            'answers' => $answers, 'score' => $grade['score'], 'total' => $grade['total'], 'detail' => $grade['detail'], 'time' => time(),
+            'answers' => quiz_unmap($answers, $quiz['map']), 'score' => $grade['score'], 'total' => $grade['total'],
+            'detail' => quiz_unmap($grade['detail'], $quiz['map']), 'time' => time(),
         ]);
         audit_log('student_quiz', ['classe' => $level, 'qcm' => $path], 'élève');
         $_SESSION['quiz_done'][$quiz['id']] = ['answers' => $answers, 'grade' => $grade, 'name' => $first . ' ' . mb_strtoupper($last), 'time' => time()];
@@ -130,7 +136,7 @@ page_top(display_name($path) . ' — QCM');
     <?php endif; ?>
     <?php if (quiz_correction_visible($quiz)): ?>
       <h2 class="h3">Corrigé</h2>
-      <?php render_quiz_correction($quiz, $mine ? $mine['answers'] : null, $mine ? $mine['detail'] : null); ?>
+      <?php render_quiz_correction($full, $mine ? $mine['answers'] : null, $mine ? $mine['detail'] : null); ?>
     <?php endif; ?>
     <div class="form__actions"><a class="btn" href="<?= h($back) ?>"><?= icon('back') ?>Retour au dossier</a></div>
 

@@ -108,6 +108,11 @@ function view_quiz(array $data, array $user)
           </div>
           <label class="toggle"><input type="checkbox" name="shuffle" value="1"<?= $quiz['shuffle'] ? ' checked' : '' ?>><span>Mélanger l’ordre des réponses</span></label>
           <div class="field">
+            <label for="qe-draw">Questions par élève <span class="hint">tirage aléatoire</span></label>
+            <input id="qe-draw" class="input" type="number" name="draw" min="0" max="<?= QUIZ_MAX_QUESTIONS ?>" value="<?= (int) $quiz['draw'] ?>">
+            <span class="hint">0 = toutes. Ex. : 10 sur 30 → chaque élève reçoit 10 questions différentes.</span>
+          </div>
+          <div class="field">
             <label for="qe-attempts">Essais par élève</label>
             <select id="qe-attempts" class="input" name="attempts">
               <?php foreach ([1 => '1 seul essai', 2 => '2 essais', 3 => '3 essais', 0 => 'Illimité (entraînement)'] as $v => $l): ?>
@@ -125,15 +130,54 @@ function view_quiz(array $data, array $user)
         <p class="muted" data-qe-empty>Aucune question pour l’instant : cliquez sur « Ajouter une question ».</p>
       <?php endif; ?>
 
+      <?php
+      // Banque de questions : les autres QCM accessibles (dossiers, banque de la matière).
+      $sources = [];
+      foreach (all_items() as $p => $t) {
+          $p = (string) $p;
+          if ($t === 'file' && is_quiz_file($p) && $p !== $item && can_manage($p, $user)) $sources[] = $p;
+      }
+      ?>
       <template data-qe-template><?php quiz_question_card(0, ['text' => '', 'multi' => false, 'options' => ['', '', ''], 'correct' => [], 'explain' => '']); ?></template>
       <template data-qe-option-template><?php quiz_option_row(0, 0, '', false); ?></template>
 
       <div class="form__actions form__actions--sticky">
         <button type="button" class="btn btn--secondary" data-qe-add><?= icon('plus') ?>Ajouter une question</button>
+        <?php if ($sources): ?><a class="btn btn--tertiary" href="#banque-questions"><?= icon('import') ?>Reprendre des questions</a><?php endif; ?>
         <button class="btn" type="submit">Enregistrer le QCM</button>
         <a class="btn btn--tertiary" href="<?= h(admin_url('library', $item)) ?>">Retour</a>
       </div>
     </form>
+
+    <?php if ($sources): $srcSel = query('source'); if (!in_array($srcSel, $sources, true)) $srcSel = ''; ?>
+      <section class="card" id="banque-questions">
+        <h2 class="h4"><?= icon('import') ?> Reprendre des questions d’un autre QCM</h2>
+        <p class="muted small">Vos QCM et ceux de la banque de ressources de votre matière servent de banque de questions. Avec « Questions par élève », chaque élève reçoit un tirage différent.</p>
+        <form method="get" class="form form--inline">
+          <input type="hidden" name="view" value="quiz"><input type="hidden" name="item" value="<?= h($item) ?>">
+          <div class="field"><label for="qi-src">QCM source</label>
+            <select id="qi-src" class="input" name="source" onchange="this.form.submit()">
+              <option value="">— Choisir —</option>
+              <?php foreach ($sources as $sp): ?><option value="<?= h($sp) ?>"<?= $sp === $srcSel ? ' selected' : '' ?>><?= h(str_replace('/', ' › ', preg_replace('/\.qcm$/', '', $sp))) ?></option><?php endforeach; ?>
+            </select></div>
+          <noscript><button class="btn btn--secondary" type="submit">Afficher</button></noscript>
+        </form>
+        <?php if ($srcSel !== ''): $from = quiz_load(full_path($srcSel, 'file')); ?>
+          <form method="post" class="form form--tight">
+            <?= csrf_field() ?>
+            <input type="hidden" name="action" value="quiz_import">
+            <input type="hidden" name="item" value="<?= h($item) ?>">
+            <input type="hidden" name="source" value="<?= h($srcSel) ?>">
+            <ul class="import-questions">
+              <?php foreach ($from['questions'] as $qi => $qq): ?>
+                <li><label class="toggle toggle--sm"><input type="checkbox" name="pick[]" value="<?= $qi ?>" checked><span><?= h(mb_strimwidth($qq['text'], 0, 140, '…')) ?> <span class="muted small">(<?= count($qq['options']) ?> réponses)</span></span></label></li>
+              <?php endforeach; ?>
+            </ul>
+            <div class="form__actions"><button class="btn btn--secondary" type="submit">Ajouter les questions cochées</button></div>
+          </form>
+        <?php endif; ?>
+      </section>
+    <?php endif; ?>
     <?php
 }
 

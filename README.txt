@@ -1,4 +1,4 @@
-TPWEB 17 - PORTAIL DE RESSOURCES PÉDAGOGIQUES (XAMPP / Windows)
+TPWEB 18 - PORTAIL DE RESSOURCES PÉDAGOGIQUES (XAMPP / Windows)
 ================================================================
 
 INSTALLATION
@@ -113,6 +113,31 @@ CONFORMITÉ (RGPD)
 - Purge automatique quotidienne : journal > 12 mois, archives de rendus > 1 an,
   corbeille > 30 jours, tentatives de connexion > 1 heure.
 - Pensez à inscrire TPWeb au registre des traitements de l'établissement (voir la fiche technique).
+
+NOUVEAUTÉS VERSION 18
+---------------------
+- Tableau de bord : nouvelle page d'accueil de l'espace enseignant (dépôts en cours avec
+  taux de rendu, nouveautés de la semaine, contenus les plus consultés, choses à traiter ;
+  pour l'administrateur : espace disque, dernières sauvegardes).
+- Élèves : « Nouveau depuis ta dernière visite », rappel la veille d'une date limite,
+  rubrique « À rendre » dans Mes travaux, favoris (étoile sur chaque document).
+- Application installable (PWA) : bouton « Installer », pages déjà vues consultables hors ligne.
+- Séquences : un dossier peut devenir une séquence numérotée (accès libre ou déblocage
+  séance par séance pour les élèves connectés par l'ENT), case « J'ai terminé », progression.
+- Annotation des copies : bouton crayon dans les rendus (PDF, images, et documents Office si
+  LibreOffice est installé) : stylo, surligneur, texte, ✓ / ✗, gomme. La copie annotée (PDF) est
+  rendue à l'élève dans « Mes travaux » si les retours sont visibles ; annotations modifiables.
+- Banque de questions : reprendre des questions d'un autre QCM, tirage aléatoire de N questions
+  par élève (toujours le même tirage pour un même élève).
+- Dupliquer / copier un dossier en gardant ses réglages de partage (classes, dates, séquence,
+  dépôt avec nouvel identifiant), avec décalage des dates d'un an pour l'année suivante.
+- Apparence : logo, couleur principale, message d'accueil pour les élèves (Paramètres).
+- Courriels (Paramètres › Courriels, SMTP) : nouveau rendu (immédiat ou résumé quotidien),
+  bilan à la fermeture d'un dépôt, nouveaux signalements. Chaque enseignant règle ses
+  notifications dans Mon compte. Avec Docker, le cron (cron.php) expédie aussi les courriels.
+- Mise à jour depuis l'interface (Administration › Mise à jour) : envoi du .zip, sauvegarde
+  automatique (réglages + code actuel), vérification puis installation ; réglages de config.php
+  conservés. Si l'application est en lecture seule (Docker « :ro »), la page donne la procédure.
 
 NOUVEAUTÉS VERSION 17
 ---------------------

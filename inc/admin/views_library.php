@@ -347,12 +347,7 @@ function view_library(array $data, array $user)
               <?php if ($canTools): ?>
                 <button type="button" class="btn btn--tertiary btn--sm" data-toggle="rename-form"><?= icon('edit') ?>Renommer</button>
                 <button type="button" class="btn btn--tertiary btn--sm" data-toggle="move-form"><?= icon('move') ?>Déplacer</button>
-                <form method="post" class="inline-form">
-                  <?= csrf_field() ?>
-                  <input type="hidden" name="action" value="duplicate">
-                  <input type="hidden" name="item" value="<?= h($selection) ?>">
-                  <button type="submit" class="btn btn--tertiary btn--sm"><?= icon('copy') ?>Dupliquer</button>
-                </form>
+                <button type="button" class="btn btn--tertiary btn--sm" data-toggle="dup-form"><?= icon('copy') ?>Dupliquer</button>
                 <form method="post" class="inline-form" data-confirm="<?= h('Placer « ' . basename($selection) . ' »' . ($kind === 'dir' ? ' et tout son contenu' : '') . ' dans la corbeille ? Il restera restaurable pendant ' . TPW_TRASH_DAYS . ' jours.') ?>">
                   <?= csrf_field() ?>
                   <input type="hidden" name="action" value="delete">
@@ -397,6 +392,13 @@ function view_library(array $data, array $user)
               $copyDest = array_values(array_filter(array_merge(is_admin($user) ? [''] : [], $folders), function ($f) use ($user, $selection) {
                   return can_manage($f, $user) && !path_within($f, $selection);
               })); ?>
+            <form method="post" class="form form--inline" id="dup-form" hidden>
+              <?= csrf_field() ?>
+              <input type="hidden" name="action" value="duplicate">
+              <input type="hidden" name="item" value="<?= h($selection) ?>">
+              <?php copy_options_fields('dup'); ?>
+              <button class="btn btn--secondary" type="submit"><?= icon('copy') ?>Dupliquer</button>
+            </form>
             <form method="post" class="form form--inline" id="copy-form" hidden>
               <?= csrf_field() ?>
               <input type="hidden" name="action" value="copy_to">
@@ -410,6 +412,7 @@ function view_library(array $data, array $user)
                   <?php endforeach; ?>
                 </select>
               </div>
+              <?php copy_options_fields('cp'); ?>
               <button class="btn btn--secondary" type="submit">Copier</button>
             </form>
           <?php endif; ?>
@@ -450,6 +453,7 @@ function view_library(array $data, array $user)
 
         <?php if ($kind === 'dir'): ?>
           <div class="tab-panel" id="contenu" data-tab-panel>
+            <?php if ($selection !== '' && !$inBank && can('publish', $user)) library_sequence($selection); ?>
             <?php library_contents($selection, $items, $data); ?>
             <?php if (can('upload', $user) || can('folders', $user)) library_upload($selection, $user); ?>
           </div>
@@ -917,5 +921,52 @@ function library_stats($selection, $kind, array $data, array $st)
       <?php endif; ?>
       <p class="muted small">Comptées une fois par élève et par demi-heure ; les consultations des enseignants ne comptent pas. Les élèves sont identifiés seulement s’ils sont connectés par l’ENT. Données conservées 12 mois.</p>
     </section>
+    <?php
+}
+
+/** Réglage « séquence » d'un dossier et progression des élèves connectés. */
+function library_sequence($selection)
+{
+    $cfg = sequence_cfg($selection);
+    $items = sequence_items($selection);
+    if (!$cfg && count($items) < 2) return;
+    $counts = $cfg ? sequence_progress_counts($selection) : [];
+    ?>
+    <details class="card card--details sequence-card"<?= $cfg ? ' open' : '' ?>>
+      <summary><span><?= icon('steps') ?> <strong>Séquence</strong> <span class="muted small">— <?= $cfg ? 'séances numérotées, ' . ($cfg['mode'] === 'order' ? 'à débloquer dans l’ordre' : 'accès libre') : 'présenter ce dossier comme une suite de séances' ?></span></span><?= icon('chevron') ?></summary>
+      <form method="post" class="form form--tight">
+        <?= csrf_field() ?>
+        <input type="hidden" name="action" value="seq_save">
+        <input type="hidden" name="folder" value="<?= h($selection) ?>">
+        <div class="choices">
+          <label class="choice"><input type="radio" name="mode" value=""<?= !$cfg ? ' checked' : '' ?>><span class="choice__body"><strong>Dossier normal</strong><span>Les élèves voient la liste habituelle des dossiers et documents.</span></span></label>
+          <label class="choice"><input type="radio" name="mode" value="free"<?= $cfg && $cfg['mode'] === 'free' ? ' checked' : '' ?>><span class="choice__body"><strong>Séquence en accès libre</strong><span>Séances numérotées dans l’ordre des noms, l’élève coche « J’ai terminé » et voit sa progression.</span></span></label>
+          <label class="choice"><input type="radio" name="mode" value="order"<?= $cfg && $cfg['mode'] === 'order' ? ' checked' : '' ?>><span class="choice__body"><strong>Séquence à débloquer dans l’ordre</strong><span>Pour les élèves connectés par l’ENT : une séance s’ouvre quand la précédente est terminée.</span></span></label>
+        </div>
+        <p class="muted small">Ordre des séances = ordre alphabétique des noms : numérotez-les (« 1 - Introduction », « 2 - TP »…). Pour une ouverture à date fixe, programmez la publication de chaque séance (onglet Partage).</p>
+        <div class="form__actions"><button class="btn btn--secondary btn--sm" type="submit">Enregistrer</button></div>
+      </form>
+      <?php if ($cfg && $items): $nbStudents = count(array_filter(students_all(), function ($s) use ($selection) { return !empty($s['progress'][$selection]); })); ?>
+        <div class="sequence-progress">
+          <h3 class="h5">Progression des élèves connectés <span class="muted small">(<?= $nbStudents ?> élève<?= $nbStudents > 1 ? 's' : '' ?> ont commencé)</span></h3>
+          <ol class="qstats">
+            <?php $max = max(1, $nbStudents); foreach ($items as $it): $c = isset($counts[$it]) ? $counts[$it] : 0; ?>
+              <li><span class="qstats__text"><?= h(sequence_title($it)) ?></span><span class="meter"><span style="width:<?= (int) round($c / $max * 100) ?>%"></span></span><span class="qstats__pct"><?= $c ?></span></li>
+            <?php endforeach; ?>
+          </ol>
+        </div>
+      <?php endif; ?>
+    </details>
+    <?php
+}
+
+/** Options d'une copie : garder le partage (publication, classes, dates, séquence), décaler les dates d'un an. */
+function copy_options_fields($p)
+{
+    ?>
+    <div class="field copy-opts">
+      <label class="toggle toggle--sm"><input type="checkbox" name="keep_rules" value="1" checked data-copy-keep><span>Garder les réglages de partage <span class="hint">classes, dates, séquence, solutions</span></span></label>
+      <label class="toggle toggle--sm"><input type="checkbox" name="shift_year" value="1"><span>Décaler les dates d’un an <span class="hint">pour l’année prochaine</span></span></label>
+    </div>
     <?php
 }

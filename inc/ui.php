@@ -75,6 +75,14 @@ function icon($name, $class = '')
         'prev'     => '<path d="m15 6-6 6 6 6"/>',
         'close'    => '<path d="M6 6l12 12M18 6 6 18"/>',
         'plus'     => '<path d="M12 5v14M5 12h14"/>',
+        'star'     => '<path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
+        'bell'     => '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0"/>',
+        'pen'      => '<path d="m14.5 4.5 5 5L9 20H4v-5z"/><path d="m12.5 6.5 5 5"/>',
+        'palette'  => '<path d="M12 3a9 9 0 1 0 0 18c1 0 1.5-.8 1.5-1.6 0-1.2-1-1.4-1-2.4 0-.9.7-1.5 1.6-1.5H17a4 4 0 0 0 4-4c0-4.7-4-8.5-9-8.5z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7" r="1"/>',
+        'mail'     => '<rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="m3.5 6 8.5 7 8.5-7"/>',
+        'dashboard'=> '<rect x="3" y="3" width="8" height="10" rx="1"/><rect x="13" y="3" width="8" height="6" rx="1"/><rect x="13" y="11" width="8" height="10" rx="1"/><rect x="3" y="15" width="8" height="6" rx="1"/>',
+        'refresh'  => '<path d="M20 11a8 8 0 0 0-14.9-3M4 13a8 8 0 0 0 14.9 3M5 4v4h4M19 20v-4h-4"/>',
+        'steps'    => '<path d="M4 20h5v-5h5v-5h5V5"/>',
     ];
     $svg = isset($paths[$name]) ? $paths[$name] : $paths['file'];
     $cls = 'icon' . ($class !== '' ? ' ' . $class : '');
@@ -96,6 +104,9 @@ function page_top($title, $area = 'public')
   <title><?= h($title) ?> · <?= h(TPW_APP_NAME) ?></title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="assets/style.css?v=<?= h(TPW_VERSION) ?>">
+  <?php $brand = branding(); if (($css = branding_css()) !== ''): ?><style><?= $css ?></style><?php endif; ?>
+  <meta name="theme-color" content="<?= h($brand['color']) ?>">
+  <?php if (!$isAdmin): ?><link rel="manifest" href="manifest.php"><link rel="apple-touch-icon" href="assets/icon-192.png"><?php endif; ?>
   <script>
     // Préférences d'affichage appliquées avant le rendu (évite un flash de thème).
     (function () {
@@ -109,12 +120,17 @@ function page_top($title, $area = 'public')
     })();
   </script>
 </head>
-<body class="area-<?= h($area) ?>">
+<body class="area-<?= h($area) ?>"<?= !$isAdmin && function_exists('current_student') && current_student() ? ' data-student="1"' : '' ?>>
+  <div class="offline-bar" role="status">Hors ligne : seuls les cours déjà ouverts sur cet appareil sont disponibles.</div>
   <a class="skip-link" href="#contenu">Aller au contenu</a>
   <header class="header" role="banner">
     <div class="container header__inner">
       <a class="brand" href="index.php" title="Accueil — <?= h(TPW_APP_NAME) ?>">
-        <span class="brand__mark" aria-hidden="true"><span>TP</span></span>
+        <?php if ($brand['logo'] !== ''): ?>
+          <span class="brand__logo" aria-hidden="true"><img src="logo.php?v=<?= h(substr(md5($brand['logo']), 0, 8)) ?>" alt=""></span>
+        <?php else: ?>
+          <span class="brand__mark" aria-hidden="true"><span>TP</span></span>
+        <?php endif; ?>
         <span class="brand__text">
           <span class="brand__name"><?= h(TPW_APP_NAME) ?></span>
           <span class="brand__tagline">Ressources pédagogiques<?= $school !== '' ? ' · ' . h($school) : '' ?></span>

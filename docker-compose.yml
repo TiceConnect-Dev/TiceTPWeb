@@ -1,0 +1,12 @@
+# Stack Portainer / docker compose pour TPWeb.
+services:
+  tpweb:
+    image: ghcr.io/xeros59/tpweb:latest      # ou :office pour les aperçus Word / PowerPoint
+    container_name: tpweb
+    restart: unless-stopped
+    ports:
+      - "8080:80"                             # à adapter (ou réseau du proxy inverse)
+    volumes:
+      - /opt/tpweb/TPWebData:/var/TPWebData   # cours, rendus, comptes, réglages, sauvegardes
+    environment:
+      TZ: Europe/Paris

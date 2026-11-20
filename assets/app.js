@@ -543,4 +543,160 @@
     });
     syncOp(); sync();
   });
+
+  /* ---------- V18 ---------- */
+
+  function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function read(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+
+  // Nouveautés depuis la dernière visite de la classe (mémorisée dans le navigateur).
+  var visit = document.querySelector('[data-visit]');
+  if (visit) {
+    var cls = visit.getAttribute('data-visit');
+    var sKey = 'tpw-prev-' + cls, lKey = 'tpw-visit-' + cls;
+    var prev = null;
+    try { prev = sessionStorage.getItem(sKey); } catch (e) {}
+    if (prev === null) { prev = read(lKey) || '0'; try { sessionStorage.setItem(sKey, prev); } catch (e) {} }
+    store(lKey, String(Math.floor(Date.now() / 1000)));
+    prev = parseInt(prev, 10) || 0;
+    if (prev > 0) {
+      var fresh = {};
+      each('[data-news]', function (li) {
+        if (parseInt(li.getAttribute('data-news'), 10) > prev) {
+          li.classList.add('is-fresh');
+          var f = li.querySelector('[data-fav]');
+          fresh[f ? f.getAttribute('data-fav') : String(Math.random())] = true;
+        }
+      });
+      var n = Object.keys(fresh).length;
+      var banner = document.querySelector('[data-fresh-banner]');
+      if (n && banner) {
+        var d = new Date(prev * 1000);
+        banner.querySelector('[data-fresh-text]').textContent = n + ' nouveauté' + (n > 1 ? 's' : '') + ' depuis ta dernière visite (le ' + d.toLocaleDateString('fr-FR') + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + ')';
+        banner.hidden = false;
+      }
+    }
+  }
+
+  // Favoris : sur le serveur pour l'élève connecté par l'ENT, dans le navigateur sinon.
+  var favBlock = document.querySelector('[data-fav-block]');
+  var favMode = favBlock ? favBlock.getAttribute('data-fav-mode') : (document.body.getAttribute('data-student') ? 'server' : 'local');
+  var favLevel = favBlock ? favBlock.getAttribute('data-level') : '';
+  var levelMatch = location.search.match(/[?&]level=([^&]+)/);
+  if (!favLevel && levelMatch) favLevel = decodeURIComponent(levelMatch[1].replace(/\+/g, ' '));
+  var favKey = 'tpw-fav-' + favLevel;
+  function localFavs() { try { return JSON.parse(read(favKey) || '[]'); } catch (e) { return []; } }
+  function renderLocalFavs() {
+    if (!favBlock || favMode !== 'local') return;
+    var list = favBlock.querySelector('[data-fav-list]');
+    var favs = localFavs();
+    list.innerHTML = '';
+    favs.forEach(function (f) {
+      var li = document.createElement('li');
+      var a = document.createElement('a');
+      a.className = 'doc';
+      a.href = f.href;
+      a.innerHTML = '<span class="doc__icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></span><span class="doc__body"><span class="doc__title"></span><span class="doc__meta"></span></span>';
+      a.querySelector('.doc__title').textContent = f.title;
+      a.querySelector('.doc__meta').textContent = f.meta || '';
+      li.appendChild(a);
+      list.appendChild(li);
+    });
+    favBlock.hidden = favs.length === 0;
+  }
+  if (favMode === 'local' && favLevel) {
+    var favPaths = localFavs().map(function (f) { return f.path; });
+    each('[data-fav]', function (b) {
+      var on = favPaths.indexOf(b.getAttribute('data-fav')) !== -1;
+      b.classList.toggle('is-on', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    renderLocalFavs();
+  }
+  each('[data-fav]', function (btn) {
+    btn.addEventListener('click', function () {
+      var path = btn.getAttribute('data-fav');
+      var on = !btn.classList.contains('is-on');
+      function apply(state) {
+        each('[data-fav="' + CSS.escape(path) + '"]', function (b) {
+          b.classList.toggle('is-on', state);
+          b.setAttribute('aria-pressed', state ? 'true' : 'false');
+          b.title = state ? 'Retirer des favoris' : 'Ajouter aux favoris';
+        });
+      }
+      if (favMode === 'server') {
+        var csrf = document.getElementById('tpw-csrf');
+        var body = new URLSearchParams({ action: 'fav_toggle', path: path, csrf: csrf ? csrf.value : '' });
+        fetch('index.php', { method: 'POST', body: body, credentials: 'same-origin' })
+          .then(function (r) { return r.json(); })
+          .then(function (j) { if (j.ok) apply(j.on); });
+        return;
+      }
+      var favs = localFavs().filter(function (f) { return f.path !== path; });
+      if (on) favs.unshift({ path: path, title: btn.getAttribute('data-fav-title'), href: btn.getAttribute('data-fav-href'), meta: btn.getAttribute('data-fav-meta') });
+      store(favKey, JSON.stringify(favs.slice(0, 30)));
+      apply(on);
+      renderLocalFavs();
+    });
+  });
+
+  // Séquences : progression gardée dans le navigateur pour un élève non connecté.
+  each('[data-seq-local]', function (box) {
+    var key = 'tpw-seq-' + box.getAttribute('data-seq-local');
+    var done = [];
+    try { done = JSON.parse(read(key) || '[]'); } catch (e) {}
+    function paint() {
+      var n = 0, items = box.querySelectorAll('[data-seq-item]');
+      Array.prototype.forEach.call(items, function (li) {
+        var on = done.indexOf(li.getAttribute('data-seq-item')) !== -1;
+        li.classList.toggle('is-done', on);
+        var b = li.querySelector('[data-seq-toggle]');
+        if (b) { b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.querySelector('span').textContent = on ? 'Terminé' : 'J’ai terminé'; }
+        if (on) n++;
+      });
+      var bar = box.querySelector('[data-seq-bar]');
+      if (bar) bar.style.width = (items.length ? Math.round(n / items.length * 100) : 0) + '%';
+      var txt = box.querySelector('[data-seq-count]');
+      if (txt) txt.textContent = n + ' / ' + items.length;
+    }
+    box.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-seq-toggle]');
+      if (!b) return;
+      var id = b.closest('[data-seq-item]').getAttribute('data-seq-item');
+      done = done.indexOf(id) === -1 ? done.concat([id]) : done.filter(function (x) { return x !== id; });
+      store(key, JSON.stringify(done));
+      paint();
+    });
+    paint();
+  });
+
+  // Application installable (PWA) et mode hors ligne.
+  if ('serviceWorker' in navigator && document.body.classList.contains('area-public')
+      && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+    window.addEventListener('load', function () { navigator.serviceWorker.register('sw.php').catch(function () {}); });
+  }
+  var installEvent = null;
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    installEvent = e;
+    each('[data-install]', function (b) { b.hidden = false; });
+  });
+  each('[data-install]', function (b) {
+    b.addEventListener('click', function () {
+      if (!installEvent) return;
+      installEvent.prompt();
+      installEvent = null;
+      b.hidden = true;
+    });
+  });
+  if (!navigator.onLine) document.body.classList.add('is-offline');
+  window.addEventListener('offline', function () { document.body.classList.add('is-offline'); });
+  window.addEventListener('online', function () { document.body.classList.remove('is-offline'); });
+
+  // Apparence : revenir à la couleur d'origine.
+  each('[data-color-reset]', function (b) {
+    b.addEventListener('click', function () {
+      b.closest('.color-row').querySelector('input[type="color"]').value = b.getAttribute('data-color-reset');
+    });
+  });
 })();

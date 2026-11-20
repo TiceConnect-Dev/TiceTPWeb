@@ -426,6 +426,78 @@ function view_settings(array $data)
       </form>
     </section>
 
+    <?php $br = branding(); ?>
+    <section class="card" id="apparence">
+      <h2 class="h4"><?= icon('palette') ?> Apparence</h2>
+      <form method="post" enctype="multipart/form-data" class="form form--tight">
+        <?= csrf_field() ?>
+        <input type="hidden" name="action" value="branding_save">
+        <div class="field-row">
+          <div class="field">
+            <label for="br-color">Couleur principale <span class="hint">boutons, liens, en-tête — le thème sombre est adapté automatiquement</span></label>
+            <div class="color-row"><input id="br-color" type="color" name="color" value="<?= h($br['color']) ?>">
+              <button type="button" class="link-btn" data-color-reset="#000091">Couleur d’origine</button></div>
+          </div>
+          <div class="field">
+            <label for="br-logo">Logo de l’établissement <span class="hint">PNG, JPG ou WebP, 1 Mo maximum, de préférence carré</span></label>
+            <?php if ($br['logo'] !== ''): ?><p class="logo-preview"><img src="logo.php?v=<?= h(substr(md5($br['logo']), 0, 8)) ?>" alt="Logo actuel"> <label class="toggle toggle--sm"><input type="checkbox" name="logo_remove" value="1"><span>Retirer le logo</span></label></p><?php endif; ?>
+            <input id="br-logo" class="input" type="file" name="logo" accept="image/png,image/jpeg,image/webp">
+          </div>
+        </div>
+        <div class="field">
+          <label for="br-msg">Message d’accueil sur la page des élèves <span class="hint">facultatif — ex. : « Le CDI est ouvert de 8 h à 17 h. »</span></label>
+          <textarea id="br-msg" class="input input--text" name="message" rows="2" maxlength="500"><?= h($br['message']) ?></textarea>
+        </div>
+        <div class="form__actions"><button class="btn btn--secondary" type="submit">Enregistrer l’apparence</button></div>
+      </form>
+    </section>
+
+    <?php $mc = mail_config(); $mq = load_json(TPW_STATE . '/mail_queue.json', []); ?>
+    <section class="card" id="courriels">
+      <div class="card__title-row">
+        <h2 class="h4"><?= icon('mail') ?> Courriels</h2>
+        <?= mail_ready() ? badge('Activés', 'success') : badge('Désactivés', 'neutral') ?>
+      </div>
+      <p class="muted small">Notifications aux enseignants : nouveaux rendus, bilan de fermeture des dépôts, signalements. Chaque enseignant choisit ses notifications dans « Mon compte ».</p>
+      <form method="post" class="form form--tight">
+        <?= csrf_field() ?>
+        <input type="hidden" name="action" value="mail_settings">
+        <label class="toggle"><input type="checkbox" name="enabled" value="1"<?= !empty($mc['enabled']) ? ' checked' : '' ?>><span>Activer l’envoi de courriels</span></label>
+        <div class="field-row">
+          <div class="field"><label for="m-from">Adresse d’expédition</label><input id="m-from" class="input" type="email" name="from" maxlength="120" value="<?= h($mc['from']) ?>" placeholder="tpweb@camilleclaudelfourmies.fr"></div>
+          <div class="field"><label for="m-fromname">Nom de l’expéditeur</label><input id="m-fromname" class="input" type="text" name="from_name" maxlength="60" value="<?= h($mc['from_name']) ?>"></div>
+        </div>
+        <div class="field"><label for="m-transport">Mode d’envoi</label>
+          <select id="m-transport" class="input input--short" name="transport">
+            <option value="smtp"<?= $mc['transport'] === 'smtp' ? ' selected' : '' ?>>Serveur SMTP (recommandé)</option>
+            <option value="php"<?= $mc['transport'] === 'php' ? ' selected' : '' ?>>Fonction mail() de PHP (sendmail du serveur)</option>
+          </select></div>
+        <div class="field-row">
+          <div class="field"><label for="m-host">Serveur SMTP</label><input id="m-host" class="input" type="text" name="host" maxlength="120" value="<?= h($mc['host']) ?>" placeholder="smtp.example.fr"></div>
+          <div class="field"><label for="m-port">Port</label><input id="m-port" class="input input--short" type="number" name="port" min="1" max="65535" value="<?= (int) $mc['port'] ?>"></div>
+          <div class="field"><label for="m-secure">Chiffrement</label>
+            <select id="m-secure" class="input" name="secure">
+              <?php foreach (['tls' => 'STARTTLS (port 587)', 'ssl' => 'SSL/TLS (port 465)', 'none' => 'Aucun (port 25, réseau interne)'] as $k => $l): ?>
+                <option value="<?= $k ?>"<?= $mc['secure'] === $k ? ' selected' : '' ?>><?= h($l) ?></option>
+              <?php endforeach; ?>
+            </select></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label for="m-user">Identifiant SMTP <span class="hint">vide si aucune authentification</span></label><input id="m-user" class="input" type="text" name="user" maxlength="120" value="<?= h($mc['user']) ?>" autocomplete="off"></div>
+          <div class="field"><label for="m-pass">Mot de passe SMTP <span class="hint"><?= secret_get('smtp_pass') !== '' ? 'enregistré — laisser vide pour le garder' : 'non enregistré' ?></span></label><input id="m-pass" class="input" type="password" name="pass" maxlength="200" autocomplete="new-password"></div>
+        </div>
+        <div class="field"><label for="m-base">Adresse publique du portail <span class="hint">pour les liens des courriels — vide = détectée automatiquement (<?= h(mail_base_url() ?: '?') ?>)</span></label>
+          <input id="m-base" class="input" type="url" name="base" maxlength="200" value="<?= h($mc['base']) ?>" placeholder="https://tpweb.camilleclaudelfourmies.fr"></div>
+        <div class="form__actions">
+          <button class="btn btn--secondary" type="submit">Enregistrer</button>
+          <button class="btn btn--tertiary" type="submit" name="test" value="1"><?= icon('mail') ?>Enregistrer et m’envoyer un courriel de test</button>
+        </div>
+      </form>
+      <?php if ($mq): ?>
+        <p class="muted small"><?= count($mq) ?> courriel(s) en attente<?php $lastErr = end($mq); if (!empty($lastErr['error'])) echo ' · dernière erreur : ' . h($lastErr['error']); ?></p>
+      <?php endif; ?>
+    </section>
+
     <?php legal_settings_card($data); ?>
 
     <?php $ent = ent_config($data); $service = app_base_url($ent) . '/cas.php'; ?>
@@ -576,6 +648,30 @@ function view_account(array $user)
           </div>
         </fieldset>
         <div class="form__actions"><button class="btn" type="submit">Enregistrer</button></div>
+      </form>
+    </section>
+
+    <?php $np = mail_prefs($user); ?>
+    <section class="card" id="notifications">
+      <h2 class="h4"><?= icon('mail') ?> Notifications par courriel</h2>
+      <?php if (!mail_ready()): ?><p class="muted small">L’administrateur n’a pas encore configuré l’envoi de courriels (Paramètres › Courriels). Vous pouvez déjà renseigner votre adresse.</p><?php endif; ?>
+      <form method="post" class="form form--tight">
+        <?= csrf_field() ?>
+        <input type="hidden" name="action" value="notify_save">
+        <div class="field">
+          <label for="acc-mail">Adresse électronique <span class="hint">académique de préférence</span></label>
+          <input id="acc-mail" class="input input--short" type="email" name="email" maxlength="120" value="<?= h(user_email($user)) ?>" placeholder="prenom.nom@ac-lille.fr">
+        </div>
+        <fieldset class="fieldset"><legend>Nouveaux rendus dans mes dépôts</legend>
+          <?php foreach (['instant' => 'Un courriel à chaque rendu', 'daily' => 'Un résumé par jour (vers 17 h)', 'off' => 'Jamais'] as $k => $l): ?>
+            <label class="toggle toggle--sm"><input type="radio" name="submit" value="<?= $k ?>"<?= $np['submit'] === $k ? ' checked' : '' ?>><span><?= h($l) ?></span></label>
+          <?php endforeach; ?>
+        </fieldset>
+        <label class="toggle toggle--sm"><input type="checkbox" name="closed" value="1"<?= $np['closed'] ? ' checked' : '' ?>><span>Bilan à la fermeture d’un dépôt <span class="hint">nombre de rendus, élèves sans rendu</span></span></label>
+        <?php if ($user['role'] === 'admin'): ?>
+          <label class="toggle toggle--sm"><input type="checkbox" name="feedback" value="1"<?= $np['feedback'] ? ' checked' : '' ?>><span>Nouveaux signalements (bugs, idées)</span></label>
+        <?php endif; ?>
+        <div class="form__actions"><button class="btn btn--secondary" type="submit">Enregistrer</button></div>
       </form>
     </section>
 

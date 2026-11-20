@@ -131,6 +131,12 @@ function view_deposit_detail($item, array $cfg)
                   <td class="num"><?= h(human_size($e['size'])) ?></td>
                   <td class="actions">
                     <a class="icon-btn" href="<?= h($base . '&dl=rendu&f=' . rawurlencode($e['file'])) ?>" title="Télécharger"><?= icon('download') ?><span class="sr-only">Télécharger</span></a>
+                    <?php if (deposit_annotatable($e['file'])): ?>
+                      <a class="icon-btn<?= !empty($e['corrected']) ? ' icon-btn--done' : '' ?>" href="<?= h('annotate.php?item=' . rawurlencode($item) . '&f=' . rawurlencode($e['file'])) ?>" title="<?= !empty($e['corrected']) ? 'Copie annotée — reprendre l’annotation' : 'Annoter la copie' ?>"><?= icon('pen') ?><span class="sr-only">Annoter</span></a>
+                    <?php endif; ?>
+                    <?php if (!empty($e['corrected'])): ?>
+                      <a class="icon-btn icon-btn--done" href="<?= h($base . '&dl=rendu&corr=1&f=' . rawurlencode($e['file'])) ?>" title="Télécharger la copie annotée"><?= icon('check') ?><span class="sr-only">Copie annotée</span></a>
+                    <?php endif; ?>
                     <form method="post" class="inline-form" data-confirm="Supprimer ce rendu de <?= h(deposit_members_text($e)) ?> ?">
                       <?= csrf_field() ?>
                       <input type="hidden" name="action" value="deposit_delete_entry">
@@ -574,7 +580,7 @@ function deposit_tracking_card($item, array $cfg, array $entries)
             </tbody>
           </table>
         </div>
-        <label class="toggle"><input type="checkbox" name="public" value="1"<?= !empty($cfg['feedback_public']) ? ' checked' : '' ?>><span>Les élèves voient leur note et leur commentaire <span class="muted small">(page « Mes travaux » ou avec leur numéro de reçu)</span></span></label>
+        <label class="toggle"><input type="checkbox" name="public" value="1"<?= !empty($cfg['feedback_public']) ? ' checked' : '' ?>><span>Les élèves voient leur note, leur commentaire et leur copie annotée <span class="muted small">(page « Mes travaux » ou avec leur numéro de reçu)</span></span></label>
         <div class="form__actions">
           <button class="btn" type="submit" name="do" value="save">Enregistrer les notes</button>
           <?php if ($missing): ?>

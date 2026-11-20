@@ -51,11 +51,12 @@ page_top('Mentions légales et données personnelles');
         <tr><td>Élèves</td><td>Nom, prénom, classe, fichiers déposés (et noms des coéquipiers), date et heure du dépôt, numéro de reçu</td><td>Année scolaire en cours ; archivés à la fin de l’année puis supprimés automatiquement au bout d’un an</td></tr>
         <tr><td>Élèves</td><td>QCM : nom, prénom, classe, groupe, réponses et note</td><td>Comme les dépôts (année scolaire, puis archives un an)</td></tr>
         <tr><td>Élèves (si la liste est utilisée)</td><td>Nom, prénom, classe, groupes, identifiant ENT</td><td>Année scolaire en cours ; liste vidée en fin d’année</td></tr>
-        <tr><td>Élèves</td><td>Notes et commentaires des enseignants sur les travaux rendus</td><td>Comme les dépôts</td></tr>
+        <tr><td>Élèves</td><td>Notes, commentaires et copies annotées par les enseignants</td><td>Comme les dépôts</td></tr>
+        <tr><td>Élèves connectés par l’ENT</td><td>Documents mis en favoris, séances marquées « terminées »</td><td>Année scolaire en cours ; supprimés avec la liste des élèves</td></tr>
         <tr><td>Élèves</td><td>Consultations des ressources : date, ressource, classe (et identifiant de l’élève s’il est connecté par l’ENT)</td><td>12 mois, puis suppression automatique</td></tr>
         <tr><td>Tous</td><td>Signalements (bugs, idées) : texte, nom indiqué, classe</td><td>Jusqu’à leur suppression par l’administrateur</td></tr>
         <tr><td>Élèves</td><td>Groupe choisi dans la classe (groupe de besoin, tiers-temps…)</td><td>Session du navigateur uniquement (effacé à sa fermeture)</td></tr>
-        <tr><td>Enseignants</td><td>Identifiant, nom affiché, mot de passe chiffré (haché), identifiant ENT, matière et classes, clé de double authentification et codes de secours (chiffrés)</td><td>Jusqu’à la suppression du compte</td></tr>
+        <tr><td>Enseignants</td><td>Identifiant, nom affiché, mot de passe chiffré (haché), identifiant ENT, matière et classes, adresse électronique et préférences de notification, clé de double authentification et codes de secours (chiffrés)</td><td>Jusqu’à la suppression du compte</td></tr>
         <tr><td>Tous</td><td>Journal d’activité : date, compte, action effectuée, adresse IP</td><td><?= AUDIT_MONTHS ?> mois, puis suppression automatique</td></tr>
         <tr><td>Tous</td><td>Empreinte chiffrée de l’adresse IP en cas d’échec de connexion (protection contre les attaques)</td><td>1 heure</td></tr>
       </tbody>
@@ -67,7 +68,7 @@ page_top('Mentions légales et données personnelles');
   <p>Les travaux déposés et les résultats des QCM ne sont accessibles qu’aux enseignants qui gèrent le dossier concerné (y compris les collègues avec qui ce dossier est partagé) et à l’administrateur du portail. Les ressources publiées sont visibles des seules classes choisies par l’enseignant, le cas échéant protégées par un code d’accès.</p>
 
   <h2 class="h3">Cookies et stockage local</h2>
-  <p>TPWeb n’utilise aucun cookie publicitaire ni outil de mesure d’audience. Un seul cookie, strictement nécessaire, maintient la session (accès à la classe, espace enseignant) ; il est supprimé à la fermeture du navigateur. Les préférences d’affichage (thème, taille du texte, lecture facilitée) sont enregistrées uniquement sur votre appareil. Ces éléments ne nécessitent pas de consentement.</p>
+  <p>TPWeb n’utilise aucun cookie publicitaire ni outil de mesure d’audience. Un seul cookie, strictement nécessaire, maintient la session (accès à la classe, espace enseignant) ; il est supprimé à la fermeture du navigateur. Les préférences d’affichage (thème, taille du texte, lecture facilitée), la date de dernière visite, les favoris et la progression dans les séquences (sans connexion ENT) ainsi que les pages mises en cache pour la consultation hors ligne sont enregistrés uniquement sur votre appareil. Ces éléments ne nécessitent pas de consentement.</p>
 
   <h2 class="h3">Contenus de tiers</h2>
   <p>Certaines ressources sont des liens vers des sites extérieurs ou des vidéos YouTube. Les vidéos sont intégrées en mode « confidentialité renforcée » (youtube-nocookie.com) : YouTube ne reçoit des informations (dont l’adresse IP) que si vous lancez la lecture. Les sites extérieurs ouverts par un lien appliquent leurs propres règles.</p>

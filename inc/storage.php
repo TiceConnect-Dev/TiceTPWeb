@@ -243,3 +243,38 @@ function parse_structure_text($text)
     if (count($levels) > 300) return 'Trop de classes (300 maximum).';
     return ['structure' => $structure, 'levels' => $levels];
 }
+
+/* ---------- Apparence (logo, couleur, message d'accueil) ---------- */
+
+function branding()
+{
+    $data = settings();
+    $b = isset($data['branding']) && is_array($data['branding']) ? $data['branding'] : [];
+    $b += ['color' => '#000091', 'logo' => '', 'message' => ''];
+    if (!preg_match('/^#[0-9a-f]{6}$/i', $b['color'])) $b['color'] = '#000091';
+    if ($b['logo'] !== '' && !is_file(branding_dir() . DIRECTORY_SEPARATOR . $b['logo'])) $b['logo'] = '';
+    return $b;
+}
+
+function branding_dir()
+{
+    return TPW_STATE . DIRECTORY_SEPARATOR . 'apparence';
+}
+
+/** Mélange une couleur hexadécimale avec du blanc (t > 0) ou du noir (t < 0). */
+function color_mix($hex, $t)
+{
+    $rgb = [hexdec(substr($hex, 1, 2)), hexdec(substr($hex, 3, 2)), hexdec(substr($hex, 5, 2))];
+    foreach ($rgb as $i => $c) $rgb[$i] = (int) round($t >= 0 ? $c + (255 - $c) * $t : $c * (1 + $t));
+    return sprintf('#%02x%02x%02x', $rgb[0], $rgb[1], $rgb[2]);
+}
+
+/** Couleur principale choisie, déclinée pour le thème clair et le thème sombre. */
+function branding_css()
+{
+    $c = branding()['color'];
+    if (strtolower($c) === '#000091') return '';
+    return ':root{--blue:' . $c . ';--blue-hover:' . color_mix($c, .18) . ';--blue-active:' . color_mix($c, .3) . ';--blue-soft:' . color_mix($c, .86) . ';--blue-softer:' . color_mix($c, .94) . '}'
+        . 'html[data-theme="dark"]{--blue:' . color_mix($c, .5) . ';--blue-hover:' . color_mix($c, .62) . ';--blue-active:' . color_mix($c, .7) . ';--blue-soft:' . color_mix($c, -.62) . ';--blue-softer:' . color_mix($c, -.74) . '}'
+        . '.brand__mark{background:' . $c . '}';
+}

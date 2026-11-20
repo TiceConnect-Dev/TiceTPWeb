@@ -1,0 +1,84 @@
+name: Image Docker
+
+# Construit l'image TPWeb et la publie sur le registre GitHub : ghcr.io/<propriétaire>/tpweb
+#   :latest (amd64 + arm64)   et   :office (avec LibreOffice, amd64)
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: standard
+            suffix: ''
+            office: 'false'
+            platforms: linux/amd64,linux/arm64
+          - variant: office
+            suffix: '-office'
+            office: 'true'
+            platforms: linux/amd64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Nom de l'image en minuscules
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/tpweb" >> "$GITHUB_ENV"
+
+      - name: Version de TPWeb (config.php)
+        run: echo "TPW_VERSION=$(sed -n "s/.*'TPW_VERSION', '\([^']*\)'.*/\1/p" config.php)" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Connexion au registre GitHub
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Étiquettes
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: |
+            latest=false
+          tags: |
+            type=raw,value=latest,enable=${{ matrix.variant == 'standard' && github.ref == 'refs/heads/main' }}
+            type=raw,value=office,enable=${{ matrix.variant == 'office' && github.ref == 'refs/heads/main' }}
+            type=raw,value=${{ env.TPW_VERSION }}${{ matrix.suffix }},enable=${{ github.ref == 'refs/heads/main' }}
+            type=semver,pattern={{version}},suffix=${{ matrix.suffix }}
+            type=sha,prefix=sha-,suffix=${{ matrix.suffix }},format=short
+          labels: |
+            org.opencontainers.image.title=TPWeb
+            org.opencontainers.image.description=Portail pédagogique auto-hébergé
+            org.opencontainers.image.version=${{ env.TPW_VERSION }}
+
+      - name: Construction et publication
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ matrix.platforms }}
+          build-args: WITH_LIBREOFFICE=${{ matrix.office }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.variant }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.variant }}

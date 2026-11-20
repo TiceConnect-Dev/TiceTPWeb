@@ -28,7 +28,8 @@ function quiz_normalize($q)
 {
     if (!is_array($q)) $q = [];
     $q += ['id' => '', 'title' => '', 'intro' => '', 'show_correction' => true, 'shuffle' => false, 'questions' => [], 'attempts' => 1,
-           'until' => '', 'correction' => ''];
+           'until' => '', 'correction' => '', 'draw' => 0];
+    $q['draw'] = max(0, min(QUIZ_MAX_QUESTIONS, (int) $q['draw']));
     // Correction : immédiate, à la fermeture du QCM, ou jamais (compatibilité : show_correction).
     if (!in_array($q['correction'], ['immediate', 'after_close', 'never'], true)) $q['correction'] = $q['show_correction'] ? 'immediate' : 'never';
     $q['until'] = clean_datetime($q['until']);
@@ -197,6 +198,7 @@ function render_quiz_correction(array $quiz, $answers = null, $detail = null)
     ?>
     <ol class="quiz-list">
       <?php foreach ($quiz['questions'] as $i => $q):
+          if ($detail !== null && $quiz['draw'] > 0 && !isset($detail[$i])) continue; // question non tirée pour cet élève
           $given = $answers !== null && isset($answers[$i]) ? $answers[$i] : [];
           $ok = $detail !== null ? !empty($detail[$i]['ok']) : null; ?>
         <li class="quiz-q<?= $ok === null ? '' : ($ok ? ' quiz-q--ok' : ' quiz-q--ko') ?>">
@@ -215,4 +217,29 @@ function render_quiz_correction(array $quiz, $answers = null, $detail = null)
       <?php endforeach; ?>
     </ol>
     <?php
+}
+
+/**
+ * Tirage aléatoire : chaque élève reçoit « draw » questions parmi toutes (toujours les mêmes pour
+ * un même élève), dans l'ordre du QCM. Retourne le QCM réduit avec 'map' = indices d'origine.
+ */
+function quiz_subset(array $quiz, $seed)
+{
+    $all = array_keys($quiz['questions']);
+    if ($quiz['draw'] <= 0 || $quiz['draw'] >= count($all)) return $quiz + ['map' => $all];
+    usort($all, function ($a, $b) use ($seed) { return strcmp(md5($seed . '|' . $a), md5($seed . '|' . $b)); });
+    $pick = array_slice($all, 0, $quiz['draw']);
+    sort($pick);
+    $sub = $quiz;
+    $sub['questions'] = array_map(function ($i) use ($quiz) { return $quiz['questions'][$i]; }, $pick);
+    $sub['map'] = $pick;
+    return $sub;
+}
+
+/** Réindexe des réponses / un détail du QCM réduit vers les questions d'origine. */
+function quiz_unmap(array $values, array $map)
+{
+    $out = [];
+    foreach ($values as $i => $v) if (isset($map[$i])) $out[$map[$i]] = $v;
+    return $out;
 }

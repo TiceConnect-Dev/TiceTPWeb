@@ -304,6 +304,12 @@ function rekey_paths($old, $new)
         if ($p !== null) $coteach[$p] = $logins;
     }
     $data['coteach'] = $coteach;
+    $seqs = [];
+    foreach (isset($data['sequences']) && is_array($data['sequences']) ? $data['sequences'] : [] as $path => $cfg) {
+        $p = $map((string) $path);
+        if ($p !== null) $seqs[$p] = $cfg;
+    }
+    $data['sequences'] = $seqs;
     save_settings($data);
 
     $deposits = [];
@@ -410,4 +416,48 @@ function url_host($url)
 {
     $host = (string) parse_url($url, PHP_URL_HOST);
     return preg_replace('/^www\./', '', $host);
+}
+
+/**
+ * Reporte sur une copie les réglages de partage de l'original (règles, séquences),
+ * en décalant éventuellement toutes les dates d'un an. Retourne le nombre de règles copiées.
+ */
+function clone_sharing($from, $to, $shiftYear = false)
+{
+    $data = settings();
+    $shift = function ($v) use ($shiftYear) {
+        if (!$shiftYear || !is_string($v) || $v === '' || parse_datetime($v) === null) return $v;
+        $ts = strtotime('+1 year', parse_datetime($v));
+        return strpos($v, 'T') !== false ? date('Y-m-d\TH:i', $ts) : date(strlen($v) > 10 ? 'Y-m-d H:i' : 'Y-m-d', $ts);
+    };
+    $map = function ($p) use ($from, $to) { return $p === $from ? $to : $to . substr($p, strlen($from)); };
+    $n = 0;
+    foreach ($data['rules'] as $p => $r) {
+        $p = (string) $p;
+        if (!path_within($p, $from) || !is_array($r)) continue;
+        foreach (['from', 'until', 'solution_from'] as $k) if (isset($r[$k])) $r[$k] = $shift($r[$k]);
+        if (isset($r['published_at'])) $r['published_at'] = time();
+        $data['rules'][$map($p)] = $r;
+        $n++;
+    }
+    if (!empty($data['sequences'])) {
+        foreach ($data['sequences'] as $p => $s) if (path_within((string) $p, $from)) $data['sequences'][$map((string) $p)] = $s;
+    }
+    save_settings($data);
+    // Dépôts de copies : même configuration, nouvel identifiant (les rendus de l'original restent à part).
+    $deps = deposits_config();
+    $changed = false;
+    foreach ($deps as $p => $cfg) {
+        $p = (string) $p;
+        if (!path_within($p, $from) || !is_array($cfg)) continue;
+        $cfg['id'] = bin2hex(random_bytes(8));
+        foreach (['from', 'until', 'solution_from'] as $k) if (isset($cfg[$k])) $cfg[$k] = $shift($cfg[$k]);
+        if (isset($cfg['solution']) && is_string($cfg['solution']) && path_within($cfg['solution'], $from)) $cfg['solution'] = $map($cfg['solution']);
+        unset($cfg['reminded'], $cfg['closed_notified']);
+        $deps[$map($p)] = $cfg;
+        $changed = true;
+        $n++;
+    }
+    if ($changed) save_deposits_config($deps);
+    return $n;
 }

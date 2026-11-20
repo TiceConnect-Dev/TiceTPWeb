@@ -265,6 +265,8 @@ function deposit_delete_entry(array $cfg, $file)
 {
     $full = deposit_file_path($cfg, $file);
     if ($full) @unlink($full);
+    $corr = deposit_file_path($cfg, deposit_correction_name($file));
+    if ($corr) @unlink($corr);
     deposit_update_index($cfg, function ($list) use ($file) {
         return array_filter($list, function ($e) use ($file) {
             return $e['file'] !== $file;
@@ -312,6 +314,14 @@ function deposit_submitters(array $entries)
     return $out;
 }
 
+/** Nombre d'élèves distincts ayant rendu (membres des groupes compris). */
+function deposit_submitter_count(array $entries)
+{
+    $keys = [];
+    foreach ($entries as $e) foreach (deposit_members($e) as $m) $keys[deposit_name_key($e['level'], $m['last'], $m['first'])] = true;
+    return count($keys);
+}
+
 /** Statut d'un élève de la liste pour un dépôt (null = pas rendu). */
 function deposit_student_status(array $s, array $submitters)
 {
@@ -356,4 +366,63 @@ function deposit_feedback_for(array $fb, $studentId, $level, $last, $first)
     if ($studentId !== '' && isset($fb['s:' . $studentId])) return $fb['s:' . $studentId];
     $k = deposit_name_key($level, $last, $first);
     return isset($fb[$k]) ? $fb[$k] : null;
+}
+
+/* ---------- Copies annotées (corrections) ---------- */
+
+/** Types de rendus que l'outil d'annotation sait ouvrir. */
+function deposit_annotatable($file)
+{
+    $ext = strtolower(pathinfo((string) $file, PATHINFO_EXTENSION));
+    if (in_array($ext, ['pdf', 'png', 'jpg', 'jpeg', 'webp', 'gif'], true)) return true;
+    return function_exists('is_office_file') && is_office_file($file) && function_exists('soffice_path') && soffice_path();
+}
+
+/** Nom du fichier corrigé d'un rendu : corrections/<nom du rendu>.pdf */
+function deposit_correction_name($file)
+{
+    return 'corrections/' . preg_replace('/[^A-Za-z0-9._-]/', '_', str_replace('/', '-', pathinfo((string) $file, PATHINFO_DIRNAME) . '/' . pathinfo((string) $file, PATHINFO_FILENAME))) . '.pdf';
+}
+
+/** Enregistre la copie annotée (PDF) d'un rendu. Retourne '' ou une erreur. */
+function deposit_save_correction(array $cfg, $file, $tmpPdf, $annots = '')
+{
+    if (!deposit_file_path($cfg, $file)) return 'Rendu introuvable.';
+    $fh = @fopen($tmpPdf, 'rb');
+    $head = $fh ? fread($fh, 5) : '';
+    if ($fh) fclose($fh);
+    if ($head !== '%PDF-') return 'Le fichier reçu n’est pas un PDF.';
+    if (filesize($tmpPdf) > 60 * 1024 * 1024) return 'Copie annotée trop volumineuse (60 Mo maximum).';
+    $dir = deposit_dir($cfg) . DIRECTORY_SEPARATOR . 'corrections';
+    if (!is_dir($dir) && !@mkdir($dir, 0750, true)) return 'Impossible d’enregistrer la copie annotée.';
+    $name = deposit_correction_name($file);
+    $dest = deposit_dir($cfg) . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $name);
+    if (!@copy($tmpPdf, $dest)) return 'Impossible d’enregistrer la copie annotée.';
+    // Annotations « vectorielles » pour pouvoir reprendre la correction plus tard.
+    $json = json_decode((string) $annots, true);
+    if (is_array($json) && strlen($annots) < 5 * 1024 * 1024) atomic_json(preg_replace('/\.pdf$/', '.json', $dest), $json);
+    deposit_update_index($cfg, function ($list) use ($file, $name) {
+        foreach ($list as $k => $e) if ($e['file'] === $file) { $list[$k]['corrected'] = $name; $list[$k]['corrected_at'] = time(); }
+        return $list;
+    });
+    return '';
+}
+
+function deposit_delete_correction(array $cfg, $file)
+{
+    $full = deposit_file_path($cfg, deposit_correction_name($file));
+    if ($full) @unlink($full);
+    $json = deposit_file_path($cfg, preg_replace('/\.pdf$/', '.json', deposit_correction_name($file)));
+    if ($json) @unlink($json);
+    deposit_update_index($cfg, function ($list) use ($file) {
+        foreach ($list as $k => $e) if ($e['file'] === $file) unset($list[$k]['corrected'], $list[$k]['corrected_at']);
+        return $list;
+    });
+}
+
+/** Lien public vers la copie corrigée d'un rendu (si l'enseignant a rendu les retours visibles). */
+function deposit_correction_url(array $cfg, array $e)
+{
+    if (empty($cfg['feedback_public']) || empty($e['corrected'])) return '';
+    return 'copie.php?d=' . rawurlencode($cfg['id']) . '&f=' . rawurlencode($e['file']) . (!empty($e['receipt']) ? '&r=' . rawurlencode($e['receipt']) : '');
 }

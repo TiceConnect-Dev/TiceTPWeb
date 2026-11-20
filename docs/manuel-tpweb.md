@@ -1,10 +1,10 @@
-# Manuel de TPWeb 17.0
+# Manuel de TPWeb 18.0
 
 <p align="center">
   <img src="images/tpweb-cover.png" alt="TPWeb — portail de cours, QCM et rendus" width="960">
 </p>
 
-Ce guide accompagne l’installation de TPWeb 17.0, la configuration de l’établissement et l’utilisation du portail au quotidien.
+Ce guide accompagne l’installation de TPWeb 18.0, la configuration de l’établissement et l’utilisation du portail au quotidien.
 
 [Contenu du dépôt](#contenu-du-dépôt) · [Installation](#installation) · [Configuration](#configuration-de-létablissement) · [Espace enseignant](#espace-enseignant) · [Espace élève](#espace-élève) · [Maintenance](#maintenance) · [Dépannage](#dépannage)
 
@@ -22,7 +22,7 @@ Depuis la page GitHub du projet, utilisez **Code → Download ZIP**, ou clonez l
 | [`cron.php`](../cron.php) | Purges et sauvegardes planifiées en ligne de commande |
 | [`README.txt`](../README.txt) | Guide texte livré avec le projet et historique détaillé |
 
-TPWeb initialise ses données dans `TPWebData`, hors de la racine web. Il utilise des fichiers pour stocker ses réglages et ses données. Pour Docker ou Portainer, préparez votre propre image Apache/PHP et montez un volume de données persistant.
+TPWeb initialise ses données dans `TPWebData`, hors de la racine web. Il utilise des fichiers pour stocker ses réglages et ses données. Pour Docker ou Portainer, utilisez l’image publiée `ghcr.io/xeros59/tpweb:latest` (ou `:office` avec LibreOffice) et montez un volume de données persistant sur `/var/TPWebData`.
 
 ## Installation
 
@@ -51,7 +51,9 @@ Sous Linux ou macOS, adaptez le répertoire web et le chemin de `TPWebData` à l
 
 ### Docker ou Portainer
 
-Avec une image Apache/PHP qui inclut `mbstring` et `zip`, utilisez les emplacements ci-dessous pour une application montée à la racine du site.
+Le plus simple est l’image officielle `ghcr.io/xeros59/tpweb:latest` (voir le [README](../README.md#docker--portainer)) : Apache, PHP 8.3, extensions, limites d’envoi à 64 Mo, blocage de `inc/` et tâches planifiées horaires sont déjà réglés ; il suffit de monter `/var/TPWebData`. La variante `:office` ajoute LibreOffice. Mise à jour : re-pull de l’image.
+
+Avec votre propre image Apache/PHP qui inclut `mbstring` et `zip`, utilisez les emplacements ci-dessous pour une application montée à la racine du site.
 
 | Élément | Chemin dans le conteneur | Configuration |
 | --- | --- | --- |
@@ -192,7 +194,7 @@ Sans tâche planifiée, une sauvegarde due peut démarrer au prochain accès à 
 ### Mise à jour et fin d’année
 
 1. Planifiez l’interruption de service, arrêtez Apache ou le conteneur et sauvegardez **le dossier applicatif et `TPWebData`**.
-2. Remplacez le dossier de l’application par celui de TPWeb 17.0 récupéré sur GitHub. Conservez `TPWebData` au même emplacement et reportez vos réglages locaux pertinents dans le nouveau `config.php`.
+2. Depuis la version 18.0, envoyez l’archive dans **Administration › Mise à jour** (sauvegarde automatique, réglages de `config.php` conservés) ; avec l’image Docker, faites un re-pull. Sinon, remplacez le dossier de l’application par celui de TPWeb 18.0 récupéré sur GitHub. Conservez `TPWebData` au même emplacement et reportez vos réglages locaux pertinents dans le nouveau `config.php`.
 3. Redémarrez le serveur, rechargez la page et vérifiez la connexion, les publications, les codes et un dépôt de test. Pour un ancien compte migré, le manuel d’origine indique l’identifiant `admin` avec le mot de passe existant.
 4. Pour la clôture scolaire, utilisez **Fin d’année** après avoir vérifié votre sauvegarde. L’opération archive les rendus et remet à zéro les classes, les codes et les annonces, avec retrait des publications.
 
@@ -214,10 +216,11 @@ Sans tâche planifiée, une sauvegarde due peut démarrer au prochain accès à 
 ### Historique
 
 <details>
-<summary>Versions 10 à 17.0</summary>
+<summary>Versions 10 à 18.0</summary>
 
 | Version | Principales évolutions |
 | --- | --- |
+| **18.0** | Tableau de bord, annotation des copies, séquences, banque de questions et tirage aléatoire, favoris et rappels élèves, application installable, duplication pour l’année suivante, apparence, courriels SMTP, mise à jour depuis l’interface et image Docker. |
 | **17.0** | Suivi et relance des élèves, notes et commentaires publiables, corrigés à la fermeture, statistiques de consultation, inscription des élèves via l’ENT et signalements. |
 | **16.0** | Aperçu bureautique et projection, QCM autocorrigés, échéancier, retards et rendus de groupe, co-enseignement, groupes, double authentification, quotas et sauvegardes planifiées. |
 | **15** | Sélecteur de classes compact, bibliothèque en onglets et gestion améliorée des comptes et des dépôts. |

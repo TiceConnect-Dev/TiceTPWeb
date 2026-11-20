@@ -204,6 +204,11 @@ function rule_for($path, $level, array $data, $groups = null)
             $visible = rule_in_window($rule) && target_match(isset($rule['levels']) ? $rule['levels'] : [], $level, $groups);
         }
     }
+    // Séquence « dans l'ordre » : séance pas encore débloquée pour l'élève connecté.
+    if ($visible && sequences_map()) {
+        $st = current_student();
+        if ($st && $st['class'] === $level && sequence_locked($path, $st)) return false;
+    }
     return $visible;
 }
 

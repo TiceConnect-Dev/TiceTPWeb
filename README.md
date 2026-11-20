@@ -3,14 +3,15 @@
 </h1>
 
 <p align="center">
-  <strong>Version 17.0</strong><br>
+  <strong>Version 18.0</strong><br>
   Un portail pédagogique auto-hébergé pour les collèges et les lycées.<br>
   Les enseignants publient leurs supports par classe. Les élèves les consultent et rendent leurs travaux depuis leur navigateur.
 </p>
 
 <p align="center">
   <a href="#prise-en-main">Prise en main</a> ·
-  <a href="#nouveautés-de-la-version-170">Nouveautés 17.0</a> ·
+  <a href="#nouveautés-de-la-version-180">Nouveautés 18.0</a> ·
+  <a href="#docker--portainer">Docker</a> ·
   <a href="#fonctionnalités">Fonctionnalités</a> ·
   <a href="#installation">Installation</a> ·
   <a href="#administration">Administration</a> ·
@@ -24,6 +25,19 @@
 | **Élèves** | Accueil du portail | Choisir un niveau et une classe, saisir un code si demandé, consulter les cours, répondre aux QCM et déposer ses travaux. |
 | **Enseignants** | Espace enseignant (`admin.php`) | Organiser sa bibliothèque, publier des documents pour ses classes, projeter un support et récupérer les rendus. |
 | **Administration** | Paramètres de l’espace enseignant | Configurer l’établissement, les classes, les comptes, les droits, la connexion ENT et les sauvegardes. |
+
+## Nouveautés de la version 18.0
+
+| Fonction | Ce que vous pouvez faire |
+| --- | --- |
+| **Tableau de bord** | Retrouver à l’ouverture de l’espace enseignant les dépôts en cours et leur taux de rendu, les nouveautés de la semaine, les contenus les plus consultés et ce qui est à traiter. |
+| **Annotation des copies** | Corriger un rendu PDF, image ou document Office au stylo, au surligneur, au texte et avec ✓ / ✗. L’élève récupère sa copie corrigée en PDF dans « Mes travaux ». |
+| **Séquences** | Transformer un dossier en séances numérotées, en accès libre ou débloquées une à une, avec « J’ai terminé » et suivi de la progression. |
+| **Banque de questions** | Reprendre des questions d’autres QCM et tirer au hasard N questions différentes pour chaque élève. |
+| **Côté élèves** | Nouveautés depuis la dernière visite, rappel la veille d’une échéance, rubrique « À rendre », favoris et application installable consultable hors ligne. |
+| **Année suivante** | Dupliquer un cours en gardant ses réglages de partage, avec les dates décalées d’un an. |
+| **Apparence et courriels** | Logo, couleur et message d’accueil ; notifications SMTP aux enseignants (nouveau rendu, bilan de fermeture, signalements). |
+| **Mise à jour** | Installer une nouvelle version depuis l’interface avec sauvegarde automatique, ou re-puller l’image Docker. |
 
 ## Nouveautés de la version 17.0
 
@@ -50,6 +64,40 @@
 
 Récupérez la branche `main` via **Code → Download ZIP** ou clonez le dépôt avec Git. Le dépôt contient les pages PHP, les modules dans [`inc/`](inc/) et les ressources d’interface dans [`assets/`](assets/). TPWeb stocke ses données dans `TPWebData` et fonctionne sans serveur de base de données.
 
+### Docker / Portainer
+
+Une image est publiée automatiquement par GitHub Actions à chaque mise à jour de `main` :
+
+| Image | Contenu |
+| --- | --- |
+| `ghcr.io/xeros59/tpweb:latest` | Apache + PHP 8.3 (amd64 et arm64) |
+| `ghcr.io/xeros59/tpweb:office` | Même image avec LibreOffice : aperçus et annotation des documents Word, PowerPoint et tableurs (amd64) |
+| `ghcr.io/xeros59/tpweb:18.0` | Version figée (idem `18.0-office`) |
+
+Stack Portainer (ou `docker compose up -d` avec [`docker-compose.yml`](docker-compose.yml)) :
+
+```yaml
+services:
+  tpweb:
+    image: ghcr.io/xeros59/tpweb:latest
+    container_name: tpweb
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - /opt/tpweb/TPWebData:/var/TPWebData
+    environment:
+      TZ: Europe/Paris
+```
+
+- Toutes les données (cours, rendus, comptes, réglages, sauvegardes) sont dans le volume `/var/TPWebData` ; le code de l’image est en lecture seule.
+- Les tâches planifiées (`cron.php` : purges, sauvegardes automatiques, courriels) tournent toutes les heures dans le conteneur. `TPW_CRON=0` pour les désactiver.
+- Mise à jour : **Re-pull image** puis redéploiement de la stack dans Portainer.
+- Derrière un proxy inverse (Nginx Proxy Manager), l’adresse IP réelle des visiteurs est prise en compte.
+
+> [!NOTE]
+> Si le dépôt est privé, le paquet `ghcr.io/xeros59/tpweb` l’est aussi : déclarez le registre `ghcr.io` dans Portainer avec un jeton GitHub (`read:packages`), ou rendez le paquet public dans GitHub › Packages › tpweb › Package settings.
+
 ### Démarrage avec XAMPP
 
 1. Décompressez le ZIP et placez le contenu du projet dans `C:\xampp\htdocs\TPWeb`. Le fichier `admin.php` doit se trouver directement dans ce dossier.
@@ -69,7 +117,7 @@ Ces chemins correspondent à XAMPP sous Windows. Si votre installation utilise u
 | --- | --- |
 | **Configurer l’ENT** | Ouvrez **Paramètres → Connexion par l’ENT**. Le manuel détaille le service CAS à déclarer et la liaison des comptes. |
 | **Planifier les sauvegardes** | Configurez la fréquence et la destination dans **Sauvegardes**, puis planifiez [`cron.php`](cron.php) en ligne de commande. |
-| **Mettre à jour TPWeb** | Sauvegardez le dossier de l’application et `TPWebData`, puis suivez la procédure de mise à jour du manuel. |
+| **Mettre à jour TPWeb** | **Administration › Mise à jour** : envoyez le .zip de la nouvelle version (sauvegarde automatique avant). Avec Docker : re-pull de l’image. |
 | **Configurer les mentions légales** | Renseignez les informations de l’établissement affichées dans le portail. Le manuel détaille le journal d’activité et les durées de conservation des données. |
 
 Le [manuel complet](docs/manuel-tpweb.md) détaille aussi l’installation sous Apache, Docker ou Portainer, les réglages PHP, la connexion ENT des élèves et l’exécution des tâches planifiées.

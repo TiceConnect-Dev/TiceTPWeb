@@ -12,7 +12,7 @@ function zip_available()
 
 function backup_name_ok($name)
 {
-    return is_string($name) && preg_match('/^tpweb-\d{8}-\d{6}-(reglages|complete|avant-restauration)\.zip$/D', $name);
+    return is_string($name) && preg_match('/^tpweb-\d{8}-\d{6}-(reglages|complete|avant-restauration|avant-maj)\.zip$/D', $name);
 }
 
 function backup_list()
@@ -31,7 +31,7 @@ function backup_list()
 
 function backup_type_label($type)
 {
-    $labels = ['reglages' => 'Réglages', 'complete' => 'Complète', 'avant-restauration' => 'Avant restauration'];
+    $labels = ['reglages' => 'Réglages', 'complete' => 'Complète', 'avant-restauration' => 'Avant restauration', 'avant-maj' => 'Avant mise à jour'];
     return isset($labels[$type]) ? $labels[$type] : $type;
 }
 

@@ -36,5 +36,7 @@ require_once __DIR__ . '/usage.php';
 require_once __DIR__ . '/students.php';
 require_once __DIR__ . '/feedback.php';
 require_once __DIR__ . '/stats.php';
+require_once __DIR__ . '/sequences.php';
+require_once __DIR__ . '/mail.php';
 
 init_store();

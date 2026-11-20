@@ -6,7 +6,8 @@
  * web public (htdocs). Adaptez ces chemins uniquement si votre installation est différente.
  */
 
-define('TPW_DATA', dirname(dirname(__DIR__)) . DIRECTORY_SEPARATOR . 'TPWebData');
+// Variable d'environnement TPW_DATA possible (image Docker) ; sinon deux niveaux au-dessus de ce fichier.
+define('TPW_DATA', getenv('TPW_DATA') ? rtrim(getenv('TPW_DATA'), '/\\') : dirname(dirname(__DIR__)) . DIRECTORY_SEPARATOR . 'TPWebData');
 define('TPW_COURSES', TPW_DATA . DIRECTORY_SEPARATOR . 'cours');
 define('TPW_STATE', TPW_DATA . DIRECTORY_SEPARATOR . 'config');
 define('TPW_RENDUS', TPW_DATA . DIRECTORY_SEPARATOR . 'rendus');
@@ -25,12 +26,12 @@ define('TPW_TRASH_DAYS', 30);
 define('TPW_NEW_DAYS', 7);
 
 define('TPW_APP_NAME', 'TPWeb');
-define('TPW_VERSION', '17.0');
+define('TPW_VERSION', '18.0');
 define('TPW_TIMEZONE', 'Europe/Paris');
 
 // LibreOffice (aperçu des documents Word, PowerPoint, tableurs). Vide = détection automatique.
 // Exemple Windows : 'C:\\Program Files\\LibreOffice\\program\\soffice.exe'
-define('TPW_SOFFICE', '');
+define('TPW_SOFFICE', getenv('TPW_SOFFICE') ?: '');
 
 // Longueur minimale des mots de passe enseignants.
 define('TPW_PASSWORD_MIN', 10);

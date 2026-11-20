@@ -34,6 +34,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $accessError = class_limit_message($level);
     }
 
+    if ($action === 'fav_toggle') {
+        // Favoris d'un élève connecté (les autres élèves les gardent dans leur navigateur).
+        $me = current_student();
+        header('Content-Type: application/json; charset=UTF-8');
+        $path = post('path');
+        if (!$me || !valid_path($path) || !full_path($path, 'any')) { echo json_encode(['ok' => false]); exit; }
+        $list = students_all();
+        $favs = isset($list[$me['id']]['favorites']) && is_array($list[$me['id']]['favorites']) ? $list[$me['id']]['favorites'] : [];
+        $on = !in_array($path, $favs, true);
+        $favs = $on ? array_slice(array_merge([$path], $favs), 0, 50) : array_values(array_diff($favs, [$path]));
+        $list[$me['id']]['favorites'] = $favs;
+        save_students($list);
+        echo json_encode(['ok' => true, 'on' => $on]);
+        exit;
+    }
+
+    if ($action === 'seq_done') {
+        // Séance d'une séquence marquée terminée (élève connecté).
+        $me = current_student();
+        $seq = post('seq');
+        $item = post('item');
+        if ($me && sequence_cfg($seq) && in_array($item, sequence_items($seq), true)) {
+            $list = students_all();
+            $done = isset($list[$me['id']]['progress'][$seq]) && is_array($list[$me['id']]['progress'][$seq]) ? $list[$me['id']]['progress'][$seq] : [];
+            $done = post('done') === '1' ? array_values(array_unique(array_merge($done, [$item]))) : array_values(array_diff($done, [$item]));
+            $list[$me['id']]['progress'][$seq] = $done;
+            save_students($list);
+        }
+        redirect(post('back') !== '' && strpos(post('back'), 'index.php?') === 0 ? post('back') : 'index.php');
+    }
+
     if ($action === 'student_feedback') {
         $sent = isset($_SESSION['fb_sent']) ? array_filter((array) $_SESSION['fb_sent'], function ($t) { return $t > time() - 3600; }) : [];
         if (post('website') !== '') redirect('index.php'); // piège à robots
@@ -137,6 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 audit_log('student_deposit', ['classe' => $level, 'dossier' => $dir, 'fichiers' => count($result['ok']), 'reçu' => $result['receipt']], 'élève');
                 $who = $first . ' ' . mb_strtoupper($last);
                 foreach ($members as $m) $who .= ', ' . $m['first'] . ' ' . mb_strtoupper($m['last']);
+                mail_on_submission($cfg, $dir, $level, $who, count($result['ok']), !empty($result['late']));
                 $_SESSION['receipts'][$dir][] = ['name' => $who, 'files' => $result['ok'], 'time' => time(),
                     'receipt' => $result['receipt'], 'late' => !empty($result['late']), 'level' => $level, 'folder' => basename($dir)];
             }
@@ -309,7 +341,8 @@ if (query('mestravaux') === '1') {
           <?php else: ?>
             <ul class="work__files">
               <?php foreach ($d['entries'] as $e): ?>
-                <li><?= icon('check') ?><span><strong><?= h($e['orig']) ?></strong> · <?= h(date('d/m/Y à H:i', $e['time'])) ?><?= !empty($e['late']) ? ' ' . badge('En retard', 'warning') : '' ?><?= !empty($e['receipt']) ? ' · reçu <code>' . h($e['receipt']) . '</code>' : '' ?></span></li>
+                <li><?= icon('check') ?><span><strong><?= h($e['orig']) ?></strong> · <?= h(date('d/m/Y à H:i', $e['time'])) ?><?= !empty($e['late']) ? ' ' . badge('En retard', 'warning') : '' ?><?= !empty($e['receipt']) ? ' · reçu <code>' . h($e['receipt']) . '</code>' : '' ?>
+                  <?php if (($cu = deposit_correction_url($c, $e)) !== ''): ?><br><a class="btn btn--secondary btn--sm work__corr" href="<?= h($cu) ?>"><?= icon('pen') ?>Copie corrigée</a><?php endif; ?></span></li>
               <?php endforeach; ?>
             </ul>
           <?php endif; ?>
@@ -318,7 +351,7 @@ if (query('mestravaux') === '1') {
               <?php if ($fb['grade'] !== ''): ?><p class="work__grade">Note : <strong><?= h($fb['grade']) ?></strong></p><?php endif; ?>
               <?php if ($fb['comment'] !== ''): ?><p class="work__comment"><?= icon('info') ?><span><?= nl2br(h($fb['comment'])) ?></span></p><?php endif; ?>
             </div>
-          <?php elseif ($d['entries']): ?>
+          <?php elseif ($d['entries'] && !array_filter($d['entries'], function ($e) use ($c) { return deposit_correction_url($c, $e) !== ''; })): ?>
             <p class="muted small">Pas encore de note ni de commentaire.</p>
           <?php endif; ?>
         </article>
@@ -335,7 +368,14 @@ if (query('mestravaux') === '1') {
 
       <?php if ($me): ?>
         <?php if ($me && level_ok($me['class'], $data)): ?><p><a class="link-more" href="<?= h(level_url($me['class']) . '&todo=1') ?>"><?= icon('inbox') ?>Voir ce qu’il reste à rendre</a></p><?php endif; ?>
-        <?php if (!$mine && !$quizzes): ?>
+        <?php $todoMe = level_ok($me['class'], $data) ? array_values(array_filter(student_todo($me['class'], $data), function ($tt) use ($me) {
+            return deposit_student_status($me, deposit_submitters(deposit_entries($tt['cfg']))) === null;
+        })) : []; ?>
+        <?php if ($todoMe): ?>
+          <h2 class="h4"><?= icon('clock') ?> À rendre</h2>
+          <ul class="todo-list todo-list--spaced"><?php foreach ($todoMe as $tt) todo_item($me['class'], $tt, class_home_folder($me['class'])); ?></ul>
+        <?php endif; ?>
+        <?php if (!$mine && !$quizzes && !$todoMe): ?>
           <div class="empty"><?= icon('inbox') ?><p><strong>Rien pour le moment.</strong></p><p class="muted">Tes dépôts et tes QCM apparaîtront ici.</p></div>
         <?php endif; ?>
         <?php foreach ($mine as $d) $renderDeposit($d, $me['class'], $me['last'], $me['first'], $me['id']); ?>
@@ -387,6 +427,7 @@ if ($entGate) {
         <p class="hero__kicker">Portail pédagogique de l’établissement</p>
         <h1>Cours et travaux pratiques</h1>
         <p class="lead">Connecte-toi avec ton compte ENT pour retrouver les cours de ta classe et rendre tes travaux.</p>
+        <?php $welcome = branding()['message']; if ($welcome !== ''): ?><p class="hero__message"><?= nl2br(h($welcome)) ?></p><?php endif; ?>
         <p class="hero__actions"><a class="btn btn--ent btn--hero" href="cas.php?mode=eleve"><?= icon('school') ?>Se connecter avec <?= h($entCfg['label']) ?></a></p>
       </div>
     </section>
@@ -484,6 +525,7 @@ if ($level === '') {
         <p class="hero__kicker">Portail pédagogique de l’établissement</p>
         <h1>Cours et travaux pratiques</h1>
         <p class="lead">Retrouvez les cours, sujets de TP et documents publiés par vos professeurs, et rendez vos travaux en ligne. Choisissez votre <?= $niveaux ? 'niveau' : 'classe' ?> pour commencer.</p>
+        <?php $welcome = branding()['message']; if ($welcome !== ''): ?><p class="hero__message"><?= nl2br(h($welcome)) ?></p><?php endif; ?>
         <?php $me = current_student(); $entCfg = function_exists('ent_config') ? ent_config($data) : null; ?>
         <?php if ($me && level_ok($me['class'], $data)): ?>
           <p class="hero__actions"><a class="btn btn--hero" href="<?= h(level_url($me['class'])) ?>"><?= icon('arrow') ?>Aller dans ma classe (<?= h($me['class']) ?>)</a></p>
@@ -496,6 +538,7 @@ if ($level === '') {
 
     <div class="container section">
       <?php render_student_bar(); ?>
+      <p class="install-line"><button type="button" class="btn btn--secondary btn--sm" data-install hidden><?= icon('download') ?>Installer TPWeb sur cet appareil</button></p>
       <?php if (!$data['levels']): ?>
         <div class="empty"><?= icon('info') ?><p>Aucune classe n’est encore configurée.</p></div>
       <?php endif; ?>
@@ -558,6 +601,73 @@ release_session();
 $inlineTypes = ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'txt', 'mp4', 'webm', 'mp3', 'wav'];
 $examFolders = exam_folders_for($level, $data);
 $examNow = exam_for_viewer($level, $data);
+
+/** Séquence : séances numérotées, progression, déblocage dans l'ordre. */
+function render_sequence($level, $dir, array $cfg, array $data)
+{
+    $me = current_student();
+    $mine = $me && $me['class'] === $level;
+    $GLOBALS['tpw_no_seq_lock'] = true; // visibilité de base, sans le verrou de progression
+    $items = array_values(array_filter(sequence_items($dir), function ($it) use ($level, $data) {
+        return full_path($it, 'dir') ? can_browse($it, $level, $data) : rule_for($it, $level, $data);
+    }));
+    $GLOBALS['tpw_no_seq_lock'] = false;
+    if (!$items) return;
+    $done = $mine ? sequence_done($me, $dir) : [];
+    $order = $cfg['mode'] === 'order' && $mine;
+    $open = sequence_open_index($items, $done);
+    $n = count(array_intersect($items, $done));
+    $back = 'index.php?' . (isset($_SERVER['QUERY_STRING']) ? $_SERVER['QUERY_STRING'] : '');
+    ?>
+    <section class="block sequence"<?= $mine ? '' : ' data-seq-local="' . h(md5($level . '|' . $dir)) . '"' ?>>
+      <div class="sequence__head">
+        <h2 class="h4"><?= icon('steps') ?> Séquence en <?= count($items) ?> séance<?= count($items) > 1 ? 's' : '' ?></h2>
+        <span class="sequence__count"><strong data-seq-count><?= $n ?> / <?= count($items) ?></strong> terminée<?= $n > 1 ? 's' : '' ?></span>
+      </div>
+      <div class="meter meter--seq"><span data-seq-bar style="width:<?= (int) round($n / count($items) * 100) ?>%"></span></div>
+      <?php if ($cfg['mode'] === 'order'): ?>
+        <p class="muted small"><?= $mine ? 'Chaque séance s’ouvre quand tu as terminé la précédente.' : 'Connecte-toi avec l’ENT pour enregistrer ta progression : les séances s’ouvriront au fur et à mesure.' ?></p>
+      <?php endif; ?>
+      <ol class="seq-list">
+        <?php foreach ($items as $i => $it):
+            $isDone = in_array($it, $done, true);
+            $locked = $order && $i > $open;
+            $isDir = (bool) full_path($it, 'dir');
+            $href = $isDir ? level_url($level, $it) : (is_quiz_file($it) ? 'quiz.php?level=' . rawurlencode($level) . '&path=' . rawurlencode($it) : (preview_type($it) ? 'preview.php?level=' . rawurlencode($level) . '&path=' . rawurlencode($it) : file_url($level, $it) . '&dl=1'));
+            ?>
+          <li class="seq-item<?= $isDone ? ' is-done' : '' ?><?= $locked ? ' is-locked' : '' ?><?= !$locked && !$isDone && $i === $open && $mine ? ' is-current' : '' ?>" data-seq-item="<?= h(md5($it)) ?>">
+            <span class="seq-item__num"><?= $isDone ? icon('check') : ($locked ? icon('lock') : $i + 1) ?></span>
+            <div class="seq-item__body">
+              <span class="seq-item__label">Séance <?= $i + 1 ?></span>
+              <?php if ($locked): ?>
+                <span class="seq-item__title"><?= h(sequence_title($it)) ?></span>
+                <span class="muted small">S’ouvrira quand la séance <?= $i ?> sera terminée</span>
+              <?php else: ?>
+                <a class="seq-item__title" href="<?= h($href) ?>"><?= h(sequence_title($it)) ?></a>
+                <span class="muted small"><?= $isDir ? 'Dossier' : h(file_kind($it)['label']) ?></span>
+              <?php endif; ?>
+            </div>
+            <?php if (!$locked): ?>
+              <?php if ($mine): ?>
+                <form method="post" class="inline-form">
+                  <?= csrf_field() ?>
+                  <input type="hidden" name="action" value="seq_done">
+                  <input type="hidden" name="seq" value="<?= h($dir) ?>">
+                  <input type="hidden" name="item" value="<?= h($it) ?>">
+                  <input type="hidden" name="done" value="<?= $isDone ? '0' : '1' ?>">
+                  <input type="hidden" name="back" value="<?= h($back) ?>">
+                  <button class="btn btn--sm <?= $isDone ? 'btn--tertiary' : 'btn--secondary' ?>" type="submit"><?= icon('check') ?><?= $isDone ? 'Terminé' : 'J’ai terminé' ?></button>
+                </form>
+              <?php else: ?>
+                <button type="button" class="btn btn--sm btn--secondary" data-seq-toggle aria-pressed="false"><?= icon('check') ?><span>J’ai terminé</span></button>
+              <?php endif; ?>
+            <?php endif; ?>
+          </li>
+        <?php endforeach; ?>
+      </ol>
+    </section>
+    <?php
+}
 
 /** Rappel de l'élève connecté par l'ENT. */
 function render_student_bar($level = '')
@@ -630,7 +740,8 @@ function doc_item($level, $sub, $withPath = false, array $data = null, $classHom
     $actionIcon = $external ? 'external' : ($preview ? 'arrow' : 'download');
     $iconName = $preview === 'youtube' ? 'video' : $kind['icon'];
     ?>
-    <li>
+    <?php $isFav = in_array($sub, isset($GLOBALS['tpw_favs']) ? $GLOBALS['tpw_favs'] : [], true); ?>
+    <li class="doc-item" data-news="<?= (int) news_time($sub, $data) ?>">
       <a class="doc" href="<?= h($href) ?>"<?= $external ? ' target="_blank" rel="noopener noreferrer"' : '' ?>>
         <span class="doc__icon doc__icon--<?= h($iconName) ?>"><?= icon($iconName) ?></span>
         <span class="doc__body">
@@ -639,6 +750,8 @@ function doc_item($level, $sub, $withPath = false, array $data = null, $classHom
         </span>
         <span class="doc__action"><span><?= $action ?></span><?= icon($actionIcon) ?></span>
       </a>
+      <button type="button" class="doc__fav<?= $isFav ? ' is-on' : '' ?>" data-fav="<?= h($sub) ?>" data-fav-title="<?= h(display_name($sub)) ?>" data-fav-href="<?= h($href) ?>" data-fav-meta="<?= h($kind['label']) ?>"
+              aria-pressed="<?= $isFav ? 'true' : 'false' ?>" title="<?= $isFav ? 'Retirer des favoris' : 'Ajouter aux favoris' ?>"><?= icon('star') ?><span class="sr-only">Favori</span></button>
     </li>
     <?php
 }
@@ -843,6 +956,9 @@ function render_group_bar($level, array $data, $flash)
     </details>
     <?php
 }
+
+$meFav = current_student();
+$GLOBALS['tpw_favs'] = $meFav && isset($meFav['favorites']) && is_array($meFav['favorites']) ? $meFav['favorites'] : [];
 
 $classHome = class_home_folder($level);
 // Regroupement par matière (désactivé pendant un examen : seul le dossier de l'épreuve compte).
@@ -1097,6 +1213,27 @@ page_top(($todoPage ? 'À rendre' : ($q !== '' ? 'Recherche' : ($matiere !== '' 
 
       <?php if ($showDeposit) render_deposit_box($cfg, $level, $dir, $depositFlash, $receipts); ?>
 
+      <?php if ($dir === '' && !$matiere): ?>
+        <div data-visit="<?= h($level) ?>" hidden></div>
+        <?php $welcome = branding()['message']; if ($welcome !== ''): ?><p class="hero__message hero__message--class"><?= icon('info') ?><span><?= nl2br(h($welcome)) ?></span></p><?php endif; ?>
+        <div class="fresh-banner" data-fresh-banner hidden><?= icon('star') ?><span data-fresh-text></span></div>
+        <?php
+        // Rappel à J-1 : travaux à rendre dans les 24 heures (non rendus pour un élève connecté).
+        foreach (student_todo($level, $data) as $tt) {
+            if ($tt['state'] !== 'open' || $tt['until'] === null || $tt['until'] - time() > 86400) continue;
+            if ($meFav && deposit_student_status($meFav, deposit_submitters(deposit_entries($tt['cfg']))) !== null) continue;
+            echo '<div class="alert alert--warning" role="status">' . icon('clock') . '<div><p class="alert__title">À rendre avant ' . (date('Y-m-d', $tt['until']) === date('Y-m-d') ? 'ce soir' : 'demain') . ' (' . h(date('H:i', $tt['until'])) . ')</p><p>« ' . h(basename($tt['path'])) . ' » — <a href="' . h(level_url($level, $tt['path'])) . '#rendre">Rendre mon travail</a></p></div></div>';
+        }
+        // Favoris : liste serveur pour l'élève connecté, sinon gardés dans le navigateur.
+        $favPaths = array_values(array_filter($GLOBALS['tpw_favs'], function ($p) use ($level, $data) { return full_path($p, 'file') && rule_for($p, $level, $data); }));
+        ?>
+        <section class="block favorites" data-fav-block data-fav-mode="<?= $meFav ? 'server' : 'local' ?>" data-level="<?= h($level) ?>"<?= $favPaths ? '' : ' hidden' ?>>
+          <h2 class="h4"><?= icon('star') ?> Mes favoris</h2>
+          <ul class="doc-list" data-fav-list><?php foreach ($favPaths as $fp) doc_item($level, $fp, true, $data, $classHome); ?></ul>
+        </section>
+      <?php endif; ?>
+      <input type="hidden" id="tpw-csrf" value="<?= h(csrf_token()) ?>">
+
       <?php if ($dir === ''): $todo = student_todo($level, $data); if ($todo): ?>
         <section class="block todo-block">
           <div class="todo-block__head">
@@ -1139,6 +1276,8 @@ page_top(($todoPage ? 'À rendre' : ($q !== '' ? 'Recherche' : ($matiere !== '' 
           </ul>
         </section>
       <?php endif; ?>
+
+      <?php if ($dir !== '' && ($seqCfg = sequence_cfg($dir))) { render_sequence($level, $dir, $seqCfg, $data); $folders = []; $files = []; } ?>
 
       <?php if ($folders): ?>
         <section class="block">
