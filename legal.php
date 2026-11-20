@@ -50,6 +50,10 @@ page_top('Mentions légales et données personnelles');
       <tbody>
         <tr><td>Élèves</td><td>Nom, prénom, classe, fichiers déposés (et noms des coéquipiers), date et heure du dépôt, numéro de reçu</td><td>Année scolaire en cours ; archivés à la fin de l’année puis supprimés automatiquement au bout d’un an</td></tr>
         <tr><td>Élèves</td><td>QCM : nom, prénom, classe, groupe, réponses et note</td><td>Comme les dépôts (année scolaire, puis archives un an)</td></tr>
+        <tr><td>Élèves (si la liste est utilisée)</td><td>Nom, prénom, classe, groupes, identifiant ENT</td><td>Année scolaire en cours ; liste vidée en fin d’année</td></tr>
+        <tr><td>Élèves</td><td>Notes et commentaires des enseignants sur les travaux rendus</td><td>Comme les dépôts</td></tr>
+        <tr><td>Élèves</td><td>Consultations des ressources : date, ressource, classe (et identifiant de l’élève s’il est connecté par l’ENT)</td><td>12 mois, puis suppression automatique</td></tr>
+        <tr><td>Tous</td><td>Signalements (bugs, idées) : texte, nom indiqué, classe</td><td>Jusqu’à leur suppression par l’administrateur</td></tr>
         <tr><td>Élèves</td><td>Groupe choisi dans la classe (groupe de besoin, tiers-temps…)</td><td>Session du navigateur uniquement (effacé à sa fermeture)</td></tr>
         <tr><td>Enseignants</td><td>Identifiant, nom affiché, mot de passe chiffré (haché), identifiant ENT, matière et classes, clé de double authentification et codes de secours (chiffrés)</td><td>Jusqu’à la suppression du compte</td></tr>
         <tr><td>Tous</td><td>Journal d’activité : date, compte, action effectuée, adresse IP</td><td><?= AUDIT_MONTHS ?> mois, puis suppression automatique</td></tr>

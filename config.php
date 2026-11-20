@@ -25,7 +25,7 @@ define('TPW_TRASH_DAYS', 30);
 define('TPW_NEW_DAYS', 7);
 
 define('TPW_APP_NAME', 'TPWeb');
-define('TPW_VERSION', '16.0');
+define('TPW_VERSION', '17.0');
 define('TPW_TIMEZONE', 'Europe/Paris');
 
 // LibreOffice (aperçu des documents Word, PowerPoint, tableurs). Vide = détection automatique.

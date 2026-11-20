@@ -22,7 +22,7 @@ if ($ticket !== '' && $pending) {
 } else {
     $mode = query('mode', 'login');
 }
-if (!in_array($mode, ['login', 'link', 'test'], true)) $mode = 'login';
+if (!in_array($mode, ['login', 'link', 'test', 'eleve'], true)) $mode = 'login';
 
 if (!ent_enabled($data) && !($mode === 'test' && is_admin() && $cfg['url'] !== '')) {
     fail(404, 'Connexion ENT désactivée', 'La connexion par l’ENT n’est pas activée sur ce portail.');
@@ -92,6 +92,55 @@ if ($result === null) {
     fail(502, 'Connexion ENT impossible', 'L’ENT n’a pas validé la connexion. Réessayez dans quelques instants. Détail — ' . implode(' | ', $details));
 }
 $entId = $result['user'];
+
+/* ---------- Élève (liste des élèves, Administration › Élèves) ---------- */
+
+$student = find_student_by_ent($entId);
+if ($mode === 'eleve' || ($mode === 'login' && $student !== null && find_user_by_ent($entId) === null)) {
+    if ($student === null) {
+        // Élève inconnu : création directe si l'ENT transmet nom, prénom et classe (réglage),
+        // sinon demande d'accès à faire valider par un enseignant.
+        $attrs = ent_student_attrs($result['attributes']);
+        $cls = $attrs['class'] !== '' ? match_class(preg_replace('/^.*\$/', '', $attrs['class']), $data) : '';
+        if (!empty($cfg['students_autocreate']) && $attrs['last'] !== '' && $attrs['first'] !== '' && $cls !== '') {
+            $list = students_all();
+            $nid = student_new_id();
+            $list[$nid] = ['last' => $attrs['last'], 'first' => $attrs['first'], 'class' => $cls, 'groups' => [], 'ent_id' => mb_substr($entId, 0, 120), 'created' => time()];
+            save_students($list);
+            $student = find_student($nid);
+            audit_log('student_created_ent', ['classe' => $cls], 'élève');
+        } elseif (!empty($cfg['students_selfreg'])) {
+            $_SESSION['ent_request'] = ['ent_id' => mb_substr($entId, 0, 120), 'last' => $attrs['last'], 'first' => $attrs['first'], 'class' => $cls, 'time' => time()];
+            redirect('index.php?demande=1');
+        }
+    }
+    if ($student === null) {
+        audit_log('ent_unknown', ['ent' => $entId, 'espace' => 'élèves'], '-');
+        release_session();
+        page_top('Élève non enregistré');
+        ?>
+        <div class="container container--narrow section">
+          <section class="card card--form">
+            <div class="card__icon"><?= icon('user') ?></div>
+            <h1 class="h2">Compte élève non enregistré</h1>
+            <p>Ta connexion à l’ENT a réussi, mais ton identifiant <code><?= h($entId) ?></code> n’est pas encore dans la liste des élèves de TPWeb.</p>
+            <?php if (students_ent_only($data)): ?>
+              <p>Montre ce message à ton professeur : il doit t’ajouter à la liste des élèves avec cet identifiant. Tu pourras ensuite te connecter.</p>
+              <div class="form__actions"><a class="btn" href="index.php">Retour à l’accueil</a></div>
+            <?php else: ?>
+              <p>Tu peux quand même accéder à ta classe : choisis-la sur la page d’accueil (avec le code donné par ton professeur si elle est protégée), et signale-lui ce message.</p>
+              <div class="form__actions"><a class="btn" href="index.php">Choisir ma classe</a></div>
+            <?php endif; ?>
+          </section>
+        </div>
+        <?php
+        page_end();
+        exit;
+    }
+    login_student($student);
+    audit_log('student_ent_login', ['classe' => $student['class']], 'élève');
+    redirect(level_ok($student['class'], $data) ? level_url($student['class']) : 'index.php');
+}
 
 if ($mode === 'login') {
     $user = find_user_by_ent($entId);

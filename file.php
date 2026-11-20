@@ -17,6 +17,7 @@ if (!$file || !rule_for($path, $level, $data)) {
     fail(404, 'Document indisponible', 'Ce document n’existe pas ou n’est pas publié pour votre classe.');
 }
 
+if (query('dl') === '1' || file_ext($path) === 'url') stats_record($path, $level); // téléchargement ou lien externe
 release_session();
 
 if (file_ext($path) === 'url') {

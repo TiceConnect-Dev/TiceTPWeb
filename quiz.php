@@ -30,6 +30,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     check_csrf();
     $last = clean_person_name(post('last'));
     $first = clean_person_name(post('first'));
+    $me = current_student();
+    if ($me && $me['class'] === $level) { $last = $me['last']; $first = $me['first']; }
     $answers = [];
     foreach ($quiz['questions'] as $i => $q) {
         $raw = isset($_POST['q'][$i]) ? (array) $_POST['q'][$i] : [];
@@ -38,7 +40,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }));
     }
     $results = quiz_results($quiz['id']);
-    if ($last === '' || $first === '') {
+    if (quiz_closed($quiz)) {
+        $error = 'Ce QCM est fermé depuis le ' . format_datetime($quiz['until']) . '.';
+    } elseif ($last === '' || $first === '') {
         $error = 'Indiquez votre nom et votre prénom (lettres uniquement).';
     } elseif ($quiz['attempts'] > 0 && quiz_attempts_of($results, $level, $last, $first) >= $quiz['attempts']) {
         $error = $quiz['attempts'] === 1
@@ -48,6 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $grade = quiz_grade($quiz, $answers);
         quiz_store_result($quiz, [
             'level' => $level, 'groups' => viewer_groups($level, $data), 'last' => $last, 'first' => $first,
+            'student' => $me && $me['class'] === $level ? $me['id'] : '',
             'answers' => $answers, 'score' => $grade['score'], 'total' => $grade['total'], 'detail' => $grade['detail'], 'time' => time(),
         ]);
         audit_log('student_quiz', ['classe' => $level, 'qcm' => $path], 'élève');
@@ -57,6 +62,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $done = query('done') === '1' && isset($_SESSION['quiz_done'][$quiz['id']]) ? $_SESSION['quiz_done'][$quiz['id']] : null;
+$closed = quiz_closed($quiz);
+// Élève connecté : sa dernière copie (pour afficher sa note et sa correction après la fermeture).
+$mine = null;
+$meQ = current_student();
+if ($meQ && $meQ['class'] === $level) {
+    foreach (quiz_results($quiz['id']) as $r) {
+        if ((!empty($r['student']) && $r['student'] === $meQ['id']) || mb_strtolower($r['level'] . '|' . $r['last'] . '|' . $r['first']) === mb_strtolower($level . '|' . $meQ['last'] . '|' . $meQ['first'])) { $mine = $r; break; }
+    }
+}
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && !$done) stats_record($path, $level);
 $seed = session_id() . $quiz['id'];
 release_session();
 
@@ -93,36 +108,41 @@ page_top(display_name($path) . ' — QCM');
       <p class="muted small">Votre résultat a été transmis à votre professeur.</p>
     </section>
 
-    <?php if ($quiz['show_correction']): ?>
+    <?php if (quiz_correction_visible($quiz)): ?>
       <h2 class="h3">Correction</h2>
-      <ol class="quiz-list">
-        <?php foreach ($quiz['questions'] as $i => $q): $given = isset($done['answers'][$i]) ? $done['answers'][$i] : []; $ok = !empty($g['detail'][$i]['ok']); ?>
-          <li class="quiz-q quiz-q--<?= $ok ? 'ok' : 'ko' ?>">
-            <p class="quiz-q__text"><?= nl2br(h($q['text'])) ?> <?= $ok ? badge('Juste', 'success') : badge('Faux', 'error') ?></p>
-            <ul class="quiz-correction">
-              <?php foreach ($q['options'] as $oi => $opt):
-                  $isGood = in_array($oi, $q['correct'], true); $isGiven = in_array($oi, $given, true); ?>
-                <li class="<?= $isGood ? 'is-good' : '' ?><?= $isGiven && !$isGood ? ' is-wrong' : '' ?>">
-                  <?= icon($isGood ? 'check' : ($isGiven ? 'close' : 'chevron')) ?>
-                  <span><?= h($opt) ?><?= $isGiven ? ' <em class="muted small">(votre réponse)</em>' : '' ?></span>
-                </li>
-              <?php endforeach; ?>
-            </ul>
-            <?php if ($q['explain'] !== ''): ?><p class="quiz-explain"><?= icon('info') ?><span><?= nl2br(h($q['explain'])) ?></span></p><?php endif; ?>
-          </li>
-        <?php endforeach; ?>
-      </ol>
+      <?php render_quiz_correction($quiz, $done['answers'], $g['detail']); ?>
+    <?php elseif ($quiz['correction'] === 'after_close' && $quiz['until'] !== ''): ?>
+      <?php alert('info', 'La correction sera visible ici après la fermeture du QCM, le ' . format_datetime($quiz['until']) . '.'); ?>
     <?php endif; ?>
     <div class="form__actions">
       <a class="btn" href="<?= h($back) ?>"><?= icon('back') ?>Retour au dossier</a>
       <?php if ($quiz['attempts'] !== 1): ?><a class="btn btn--secondary" href="<?= h($self) ?>">Recommencer</a><?php endif; ?>
     </div>
 
+  <?php elseif ($closed): ?>
+    <?php alert('info', 'Ce QCM est fermé depuis le ' . format_datetime($quiz['until']) . ' : il n’est plus possible d’y répondre.', 'QCM fermé'); ?>
+    <?php if ($mine): ?>
+      <section class="quiz-score">
+        <p class="quiz-score__label">Ton résultat</p>
+        <p class="quiz-score__value"><?= (int) $mine['score'] ?> / <?= (int) $mine['total'] ?></p>
+        <p class="quiz-score__sub">soit <?= h(str_replace('.', ',', (string) quiz_on20($mine['score'], $mine['total']))) ?> / 20</p>
+      </section>
+    <?php endif; ?>
+    <?php if (quiz_correction_visible($quiz)): ?>
+      <h2 class="h3">Corrigé</h2>
+      <?php render_quiz_correction($quiz, $mine ? $mine['answers'] : null, $mine ? $mine['detail'] : null); ?>
+    <?php endif; ?>
+    <div class="form__actions"><a class="btn" href="<?= h($back) ?>"><?= icon('back') ?>Retour au dossier</a></div>
+
   <?php else: ?>
+    <?php if ($quiz['until'] !== ''): ?><p class="quiz-deadline"><?= icon('clock') ?><span>À faire avant le <strong><?= h(format_datetime($quiz['until'])) ?></strong> · <span data-countdown="<?= (int) parse_datetime($quiz['until']) ?>"></span></span></p><?php endif; ?>
     <?php if ($quiz['intro'] !== ''): ?><div class="deposit__note"><?= nl2br(h($quiz['intro'])) ?></div><?php endif; ?>
     <?php if ($error !== '') alert('error', $error); ?>
     <form method="post" class="form" action="<?= h($self) ?>" data-quiz-form>
       <?= csrf_field() ?>
+      <?php $me = current_student(); if ($me && $me['class'] === $level): ?>
+        <p class="student-identity"><?= icon('user') ?><span>Réponses envoyées au nom de <strong><?= h(student_name($me)) ?></strong></span></p>
+      <?php else: ?>
       <div class="field-row">
         <div class="field">
           <label for="qz-last">Nom</label>
@@ -133,6 +153,7 @@ page_top(display_name($path) . ' — QCM');
           <input id="qz-first" class="input" type="text" name="first" required maxlength="60" autocomplete="given-name" value="<?= h(post('first')) ?>">
         </div>
       </div>
+      <?php endif; ?>
       <ol class="quiz-list">
         <?php foreach ($quiz['questions'] as $i => $q): ?>
           <li class="quiz-q">

@@ -24,6 +24,7 @@ if ($type === 'quiz') {
 }
 $officeMode = $type === 'office' ? office_preview_mode($path) : '';
 
+stats_record($path, $level);
 release_session();
 
 $folder = dirname($path) === '.' ? '' : dirname($path);

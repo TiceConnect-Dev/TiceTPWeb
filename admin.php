@@ -14,6 +14,7 @@ require_once __DIR__ . '/inc/admin/views_library.php';
 require_once __DIR__ . '/inc/admin/views_students.php';
 require_once __DIR__ . '/inc/admin/views_admin.php';
 require_once __DIR__ . '/inc/admin/views_quiz.php';
+require_once __DIR__ . '/inc/admin/views_people.php';
 
 /** Menu : clé => [libellé, icône, réservé à l'administrateur, droit nécessaire]. */
 $views = [
@@ -23,6 +24,7 @@ $views = [
     'exams'    => ['Mode examen', 'exam', false, 'exams'],
     'access'   => ['Codes d’accès', 'key', false, 'codes'],
     'groups'   => ['Groupes', 'group', false, 'groups'],
+    'students' => ['Élèves', 'school', false, 'students'],
     'trash'    => ['Corbeille', 'trash', false, 'manage'],
     'levels'   => ['Niveaux et classes', 'users', true, null],
     'users'    => ['Comptes enseignants', 'user', true, null],
@@ -32,6 +34,7 @@ $views = [
     'storage'  => ['Stockage', 'disk', true, null],
     'settings' => ['Paramètres', 'settings', true, null],
     'account'  => ['Mon compte', 'user', false, null],
+    'feedback' => ['Signaler un bug / une idée', 'megaphone', false, null],
     'quiz'     => ['QCM', 'quiz', false, 'upload'], // page sans entrée de menu (ouverte depuis la bibliothèque)
 ];
 $hiddenViews = ['quiz'];
@@ -130,6 +133,8 @@ page_top($views[$view][0] . ' — Espace enseignant', 'admin');
             <?= icon($v[1]) ?><span><?= h($v[0]) ?></span>
             <?php if ($key === 'exams' && active_exams($data)): ?><span class="sidemenu__pill"><?= count(active_exams($data)) ?></span><?php endif; ?>
             <?php if ($key === 'users' && pending_users()): ?><span class="sidemenu__pill" title="Comptes à valider"><?= count(pending_users()) ?></span><?php endif; ?>
+            <?php if ($key === 'students' && ($nr = count(student_requests_for($user)))): ?><span class="sidemenu__pill" title="Demandes d’accès"><?= $nr ?></span><?php endif; ?>
+            <?php if ($key === 'feedback' && is_admin($user) && ($nf = feedback_new_count())): ?><span class="sidemenu__pill" title="Nouveaux signalements"><?= $nf ?></span><?php endif; ?>
           </a>
         </li>
       <?php endforeach; ?>
@@ -164,7 +169,13 @@ page_top($views[$view][0] . ' — Espace enseignant', 'admin');
         case 'year':     view_year($data); break;
         case 'journal':  view_journal($data); break;
         case 'access':   view_access($data); break;
-        case 'groups':   view_groups($data, $user); break;
+        case 'groups':
+            $gc = query('class');
+            if ($gc !== '' && level_ok($gc, $data) && (is_admin($user) || in_array($gc, $user['classes'], true))) view_group_members($gc, $data);
+            else view_groups($data, $user);
+            break;
+        case 'students': view_students($data, $user); break;
+        case 'feedback': view_feedback($user); break;
         case 'quiz':     view_quiz($data, $user); break;
         case 'storage':  view_storage($data); break;
         case 'levels':   view_levels($data); break;
