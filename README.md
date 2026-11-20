@@ -12,7 +12,7 @@
   <a href="#fonctionnalités">Fonctionnalités</a> ·
   <a href="#installation">Installation</a> ·
   <a href="#administration">Administration</a> ·
-  <a href="README.txt">Manuel complet</a>
+  <a href="docs/manuel-tpweb.md">Manuel complet</a>
 </p>
 
 ## Prise en main
@@ -61,4 +61,4 @@ Ces chemins correspondent à XAMPP sous Windows. Si votre installation utilise u
 | **Mettre à jour TPWeb** | Sauvegardez le dossier de l’application et `TPWebData`, puis suivez la procédure de mise à jour du manuel. |
 | **Configurer les mentions légales** | Renseignez les informations de l’établissement affichées dans le portail. Le manuel détaille le journal d’activité et les durées de conservation des données. |
 
-Le [manuel complet](README.txt) couvre aussi les réglages PHP, les aperçus LibreOffice, l’exécution planifiée sous Windows ou Docker et l’historique des versions.
+Le [manuel complet](docs/manuel-tpweb.md) couvre aussi les réglages PHP, les aperçus LibreOffice, l’exécution planifiée sous Windows ou Docker et l’historique des versions.
