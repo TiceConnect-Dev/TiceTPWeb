@@ -1,7 +1,7 @@
 # Stack Portainer / docker compose pour TPWeb.
 services:
   tpweb:
-    image: ghcr.io/xeros59/tpweb:latest      # ou :office pour les aperçus Word / PowerPoint
+    image: ghcr.io/ticeconnect-dev/tpweb:latest      # ou :office pour les aperçus Word / PowerPoint
     container_name: tpweb
     restart: unless-stopped
     ports:

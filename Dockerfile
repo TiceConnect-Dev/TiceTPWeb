@@ -1,11 +1,11 @@
 # TPWeb — image Apache + PHP 8.3 prête à l'emploi.
-#   docker run -d -p 8080:80 -v tpweb-data:/var/TPWebData ghcr.io/xeros59/tpweb:latest
-# Variante avec LibreOffice (aperçus Word / PowerPoint, annotation des copies Office) : ghcr.io/xeros59/tpweb:office
+#   docker run -d -p 8080:80 -v tpweb-data:/var/TPWebData ghcr.io/ticeconnect-dev/tpweb:latest
+# Variante avec LibreOffice (aperçus Word / PowerPoint, annotation des copies Office) : ghcr.io/ticeconnect-dev/tpweb:office
 FROM php:8.3-apache
 
 ARG WITH_LIBREOFFICE=false
 
-LABEL org.opencontainers.image.source="https://github.com/Xeros59/TiceTPWeb" \
+LABEL org.opencontainers.image.source="https://github.com/TiceConnect-Dev/TiceTPWeb" \
       org.opencontainers.image.title="TPWeb" \
       org.opencontainers.image.description="Portail pédagogique auto-hébergé : cours, dépôts, QCM, annotation des copies"
 
@@ -32,7 +32,7 @@ RUN chmod 755 /usr/local/bin/tpweb-entrypoint \
  && mkdir -p /var/TPWebData && chown www-data:www-data /var/TPWebData
 
 ENV TPW_DATA=/var/TPWebData \
-    TPW_DOCKER_IMAGE=ghcr.io/xeros59/tpweb \
+    TPW_DOCKER_IMAGE=ghcr.io/ticeconnect-dev/tpweb \
     TPW_CRON=1 \
     TZ=Europe/Paris
 VOLUME ["/var/TPWebData"]
