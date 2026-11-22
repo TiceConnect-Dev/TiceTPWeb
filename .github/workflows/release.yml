@@ -1,0 +1,43 @@
+name: Release
+
+# Publie une release GitHub à chaque tag vX.Y.Z poussé
+# (git tag v1.2.3 && git push origin v1.2.3), ou à la main depuis l'onglet Actions.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version à publier (vX.Y.Z)
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version || github.ref_name }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Vérifier la version
+        run: |
+          [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Utiliser le format vX.Y.Z."; exit 1; }
+
+      - name: Préparer les archives
+        run: |
+          mkdir -p dist
+          git archive --format=zip --prefix=TiceTPWeb/ -o dist/TiceTPWeb-PHP.zip HEAD -- . ":(exclude).github"
+          cd dist && sha256sum *.zip > SHA256SUMS.txt
+
+      - name: Publier la release
+        run: |
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            gh release upload "$VERSION" --clobber dist/*
+          else
+            gh release create "$VERSION" --target "$GITHUB_SHA" \
+              --title "TiceTPWeb $VERSION" --generate-notes dist/*
+          fi

@@ -5,7 +5,7 @@ FROM php:8.3-apache
 
 ARG WITH_LIBREOFFICE=false
 
-LABEL org.opencontainers.image.source="https://github.com/Xeros59/tpweb" \
+LABEL org.opencontainers.image.source="https://github.com/Xeros59/TiceTPWeb" \
       org.opencontainers.image.title="TPWeb" \
       org.opencontainers.image.description="Portail pédagogique auto-hébergé : cours, dépôts, QCM, annotation des copies"
 
