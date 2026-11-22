@@ -22,7 +22,7 @@ Depuis la page GitHub du projet, utilisez **Code → Download ZIP**, ou clonez l
 | [`cron.php`](../cron.php) | Purges et sauvegardes planifiées en ligne de commande |
 | [`README.txt`](../README.txt) | Guide texte livré avec le projet et historique détaillé |
 
-TPWeb initialise ses données dans `TPWebData`, hors de la racine web. Il utilise des fichiers pour stocker ses réglages et ses données. Pour Docker ou Portainer, utilisez l’image publiée `ghcr.io/xeros59/tpweb:latest` (ou `:office` avec LibreOffice) et montez un volume de données persistant sur `/var/TPWebData`.
+TPWeb initialise ses données dans `TPWebData`, hors de la racine web. Il utilise des fichiers pour stocker ses réglages et ses données. Pour Docker ou Portainer, utilisez l’image publiée `ghcr.io/ticeconnect-dev/tpweb:latest` (ou `:office` avec LibreOffice) et montez un volume de données persistant sur `/var/TPWebData`.
 
 ## Installation
 
@@ -51,7 +51,7 @@ Sous Linux ou macOS, adaptez le répertoire web et le chemin de `TPWebData` à l
 
 ### Docker ou Portainer
 
-Le plus simple est l’image officielle `ghcr.io/xeros59/tpweb:latest` (voir le [README](../README.md#docker--portainer)) : Apache, PHP 8.3, extensions, limites d’envoi à 64 Mo, blocage de `inc/` et tâches planifiées horaires sont déjà réglés ; il suffit de monter `/var/TPWebData`. La variante `:office` ajoute LibreOffice. Mise à jour : re-pull de l’image.
+Le plus simple est l’image officielle `ghcr.io/ticeconnect-dev/tpweb:latest` (voir le [README](../README.md#docker--portainer)) : Apache, PHP 8.3, extensions, limites d’envoi à 64 Mo, blocage de `inc/` et tâches planifiées horaires sont déjà réglés ; il suffit de monter `/var/TPWebData`. La variante `:office` ajoute LibreOffice. Mise à jour : re-pull de l’image.
 
 Avec votre propre image Apache/PHP qui inclut `mbstring` et `zip`, utilisez les emplacements ci-dessous pour une application montée à la racine du site.
 

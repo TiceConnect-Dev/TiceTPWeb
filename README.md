@@ -70,16 +70,16 @@ Une image est publiée automatiquement par GitHub Actions à chaque mise à jour
 
 | Image | Contenu |
 | --- | --- |
-| `ghcr.io/xeros59/tpweb:latest` | Apache + PHP 8.3 (amd64 et arm64) |
-| `ghcr.io/xeros59/tpweb:office` | Même image avec LibreOffice : aperçus et annotation des documents Word, PowerPoint et tableurs (amd64) |
-| `ghcr.io/xeros59/tpweb:18.0` | Version figée (idem `18.0-office`) |
+| `ghcr.io/ticeconnect-dev/tpweb:latest` | Apache + PHP 8.3 (amd64 et arm64) |
+| `ghcr.io/ticeconnect-dev/tpweb:office` | Même image avec LibreOffice : aperçus et annotation des documents Word, PowerPoint et tableurs (amd64) |
+| `ghcr.io/ticeconnect-dev/tpweb:18.0` | Version figée (idem `18.0-office`) |
 
 Stack Portainer (ou `docker compose up -d` avec [`docker-compose.yml`](docker-compose.yml)) :
 
 ```yaml
 services:
   tpweb:
-    image: ghcr.io/xeros59/tpweb:latest
+    image: ghcr.io/ticeconnect-dev/tpweb:latest
     container_name: tpweb
     restart: unless-stopped
     ports:
@@ -96,7 +96,7 @@ services:
 - Derrière un proxy inverse (Nginx Proxy Manager), l’adresse IP réelle des visiteurs est prise en compte.
 
 > [!NOTE]
-> Si le dépôt est privé, le paquet `ghcr.io/xeros59/tpweb` l’est aussi : déclarez le registre `ghcr.io` dans Portainer avec un jeton GitHub (`read:packages`), ou rendez le paquet public dans GitHub › Packages › tpweb › Package settings.
+> Si le dépôt est privé, le paquet `ghcr.io/ticeconnect-dev/tpweb` l’est aussi : déclarez le registre `ghcr.io` dans Portainer avec un jeton GitHub (`read:packages`), ou rendez le paquet public dans GitHub › Packages › tpweb › Package settings.
 
 ### Démarrage avec XAMPP
 
